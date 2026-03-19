@@ -566,7 +566,7 @@ Commit message: `Add test suite: snapshot tests, YAML validation, Django check`
 
 ---
 
-## Phase 7 — Phase 2 CLI: Appliku automation
+## ✅ Phase 7 — Phase 2 CLI: Appliku automation
 
 **Goal:** Standalone CLI tool that reads Copier answers and automates Appliku provisioning via the REST API. This is a separate Python package, not a Django app.
 
@@ -668,9 +668,9 @@ Commit message: `Add Phase 2 CLI: Appliku datastore provisioning, config-vars, f
 
 ## Definition of Done
 
-- [ ] `copier copy template/ <target>` generates all required files for all combinations
-- [ ] `python manage.py check` passes on `example/demo_project/`
-- [ ] `python scripts/regenerate_example.py` reproduces the committed generated files exactly
-- [ ] All tests pass (`pytest`)
+- [x] `copier copy template/ <target>` generates all required files for all combinations
+- [x] `python manage.py check` passes on `example/demo_project/`
+- [x] `python scripts/regenerate_example.py` reproduces the committed generated files exactly
+- [x] All tests pass (`pytest` — 137 passed, 9 skipped)
 - [ ] At least one real deployment on Appliku succeeds (manual verification)
 - [ ] `copier update` on a previously generated project applies template changes cleanly

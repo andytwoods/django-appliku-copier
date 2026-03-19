@@ -3,7 +3,13 @@ name = "djangoappliku"
 version = "0.1.0"
 description = "Copier-based scaffold for Django deployments on Appliku"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "requests>=2.31",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+appliku-setup = "appliku_cli.cli:main"
 
 [dependency-groups]
 dev = [
@@ -11,6 +17,8 @@ dev = [
     "pytest>=8.0",
     "pytest-snapshot>=0.9",
     "pyyaml>=6.0",
+    "requests>=2.31",
+    "responses>=0.25",
     "django>=4.2",
     "django-environ>=0.11",
     "whitenoise>=6.0",
