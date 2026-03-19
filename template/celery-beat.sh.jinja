@@ -1,0 +1,5 @@
+{% if task_runner == "celery" and use_beat -%}
+#!/usr/bin/env bash
+set -e
+exec celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+{% endif %}
