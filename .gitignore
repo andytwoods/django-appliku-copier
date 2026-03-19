@@ -1,0 +1,68 @@
+# Appliku credentials — never commit
+.env.appliku
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+.installed.cfg
+lib/
+lib64/
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# uv
+.uv/
+
+# Distribution / packaging
+.eggs/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Snapshots (update when intentionally changing templates)
+# tests/snapshots/  ← keep committed
+
+# Django example project
+example/demo_project/.env
+example/demo_project/staticfiles/
+example/demo_project/media/
+example/demo_project/db.sqlite3
+
+# Copier internals (generated in target dirs, not here)
+.copier-answers.yml
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temp render dirs
+/tmp/
