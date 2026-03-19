@@ -1,0 +1,203 @@
+"""App creation, git remote detection, and app ID resolution for Appliku setup."""
+import logging
+import re
+import subprocess
+from pathlib import Path
+
+from appliku_cli.api import ApplikuClient
+from appliku_cli.credentials import Credentials, save_app_id
+
+logger = logging.getLogger(__name__)
+
+_GITHUB_RE = re.compile(r"github\.com[:/](.+?)(?:\.git)?$")
+_GITLAB_RE = re.compile(r"gitlab\.com[:/](.+?)(?:\.git)?$")
+_APP_NAME_RE = re.compile(r"[^a-z0-9]")
+
+
+def _sanitize_app_name(name: str) -> str:
+    """Convert a project name/slug to a valid Appliku app name matching [a-z0-9]+."""
+    sanitized = _APP_NAME_RE.sub("", name.lower())
+    if not sanitized:
+        raise ValueError(f"Cannot derive a valid Appliku app name from {name!r}")
+    return sanitized
+
+
+def detect_git_remote(cwd: Path) -> tuple[str, str | None]:
+    """Return (provider, repo_path) from the 'origin' remote URL.
+
+    provider: "github", "gitlab", or "custom"
+    repo_path: "owner/repo" string, or None for custom remotes
+    Raises RuntimeError if no origin remote is found.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        raise RuntimeError(
+            "No git remote 'origin' found. "
+            "Ensure this directory is a git repository with an 'origin' remote configured."
+        )
+
+    remote_url = result.stdout.strip()
+
+    match = _GITHUB_RE.search(remote_url)
+    if match:
+        return "github", match.group(1)
+
+    match = _GITLAB_RE.search(remote_url)
+    if match:
+        return "gitlab", match.group(1)
+
+    return "custom", None
+
+
+def _current_branch(cwd: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        branch = result.stdout.strip()
+        return branch if branch and branch != "HEAD" else "main"
+    except subprocess.CalledProcessError:
+        return "main"
+
+
+def _pick_cluster(client: ApplikuClient) -> int:
+    clusters = client.list_clusters()
+    if not clusters:
+        raise RuntimeError("No clusters found on your Appliku account.")
+    if len(clusters) == 1:
+        logger.info("Using cluster %r (id=%s)", clusters[0]["name"], clusters[0]["id"])
+        return int(clusters[0]["id"])
+    print("\nAvailable clusters:")
+    for i, c in enumerate(clusters):
+        print(f"  [{i + 1}] {c['name']}  (id={c['id']}, apps={c.get('apps_count', '?')})")
+    while True:
+        choice = input(f"Select cluster [1–{len(clusters)}]: ").strip()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(clusters):
+                return int(clusters[idx]["id"])
+        except ValueError:
+            pass
+        print("Invalid choice, please try again.")
+
+
+def _resolve_github_repo(client: ApplikuClient, repo_path: str) -> str:
+    repos = client.list_github_repos()
+    for r in repos:
+        if r.lower() == repo_path.lower():
+            return r
+    raise RuntimeError(
+        f"Repository {repo_path!r} not found in your Appliku GitHub integration.\n"
+        "Connect GitHub under Appliku → Settings → Git Integrations, then retry."
+    )
+
+
+def _resolve_gitlab_repo_id(client: ApplikuClient, repo_path: str) -> int:
+    repos = client.list_gitlab_repos()
+    for repo in repos:
+        if repo.get("path_with_namespace", "").lower() == repo_path.lower():
+            return int(repo["id"])
+    raise RuntimeError(
+        f"Repository {repo_path!r} not found in your Appliku GitLab integration.\n"
+        "Connect GitLab under Appliku → Settings → Git Integrations, then retry."
+    )
+
+
+def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
+    """Create a new Appliku application linked to the current repo.
+
+    Detects the git remote, validates it against Appliku's linked repos,
+    picks a cluster, then calls the create-app API.
+    Returns the new application ID.
+    """
+    project_slug: str = answers.get("project_slug", "") or answers.get("project_name", "")
+    app_name = _sanitize_app_name(project_slug)
+    branch = _current_branch(cwd)
+
+    logger.info("Detecting git remote in %s", cwd)
+    provider, repo_path = detect_git_remote(cwd)
+
+    cluster_id = _pick_cluster(client)
+
+    if provider == "github":
+        logger.info("Resolving GitHub repository: %s", repo_path)
+        resolved = _resolve_github_repo(client, repo_path)
+        result = client.create_app(
+            name=app_name,
+            branch=branch,
+            cluster_id=cluster_id,
+            repository_provider="github",
+            repository_name=resolved,
+        )
+
+    elif provider == "gitlab":
+        logger.info("Resolving GitLab repository: %s", repo_path)
+        gitlab_id = _resolve_gitlab_repo_id(client, repo_path)
+        result = client.create_app(
+            name=app_name,
+            branch=branch,
+            cluster_id=cluster_id,
+            repository_provider="gitlab",
+            gitlab_repository_id=gitlab_id,
+        )
+
+    else:
+        logger.warning("Remote is not GitHub or GitLab — using custom provider")
+        custom_url = input("Git clone URL (for Appliku custom provider): ").strip()
+        result = client.create_app(
+            name=app_name,
+            branch=branch,
+            cluster_id=cluster_id,
+            repository_provider="custom",
+            custom_git_url=custom_url,
+        )
+
+    app_id = int(result["id"])
+    logger.info("App created: id=%s name=%s", app_id, app_name)
+    return app_id
+
+
+def ensure_app_id(
+    credentials: Credentials,
+    client: ApplikuClient,
+    answers: dict,
+    cwd: Path | None = None,
+) -> int:
+    """Return a valid app_id, creating a new Appliku app if none is set.
+
+    If credentials.app_id is already set, returns it immediately.
+    Otherwise prompts the user to enter an existing ID or creates a new app,
+    then persists the result to .env.appliku.
+    """
+    cwd = cwd or Path.cwd()
+
+    if credentials.app_id is not None:
+        return credentials.app_id
+
+    print("\nNo APPLIKU_APP_ID is set.")
+    existing = input(
+        "Enter an existing Appliku app ID, or press Enter to create a new app: "
+    ).strip()
+
+    if existing:
+        app_id = int(existing)
+        logger.info("Using existing app_id=%s", app_id)
+    else:
+        print("Creating a new Appliku app…")
+        app_id = create_new_app(client, answers, cwd)
+
+    save_app_id(app_id, cwd)
+    credentials.app_id = app_id
+    client._app_id = app_id  # noqa: SLF001 — update in-place so caller's client works
+    return app_id

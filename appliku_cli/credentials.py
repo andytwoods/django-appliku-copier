@@ -13,11 +13,15 @@ GITIGNORE_FILENAME = ".gitignore"
 class Credentials:
     api_key: str
     team_path: str
-    app_id: int
+    app_id: int | None  # None until ensure_app_id() resolves it
 
 
 def load_credentials(cwd: Path | None = None) -> Credentials:
-    """Load credentials from .env.appliku, prompting the user if the file is missing."""
+    """Load credentials from .env.appliku, prompting the user if the file is missing.
+
+    APPLIKU_APP_ID is optional at this stage — call ensure_app_id() afterwards
+    when you need a resolved app ID.
+    """
     base = cwd or Path.cwd()
     env_file = base / ENV_FILENAME
 
@@ -28,11 +32,33 @@ def load_credentials(cwd: Path | None = None) -> Credentials:
 
     _ensure_gitignored(base)
 
+    raw_app_id = values.get("APPLIKU_APP_ID", "").strip()
     return Credentials(
         api_key=values["APPLIKU_API_KEY"],
         team_path=values["APPLIKU_TEAM_PATH"],
-        app_id=int(values["APPLIKU_APP_ID"]),
+        app_id=int(raw_app_id) if raw_app_id else None,
     )
+
+
+def save_app_id(app_id: int, cwd: Path | None = None) -> None:
+    """Persist APPLIKU_APP_ID to .env.appliku."""
+    base = cwd or Path.cwd()
+    env_file = base / ENV_FILENAME
+    if env_file.exists():
+        lines = env_file.read_text().splitlines()
+        if any(line.startswith("APPLIKU_APP_ID=") for line in lines):
+            lines = [
+                f"APPLIKU_APP_ID={app_id}" if line.startswith("APPLIKU_APP_ID=") else line
+                for line in lines
+            ]
+            env_file.write_text("\n".join(lines) + "\n")
+        else:
+            with env_file.open("a") as f:
+                f.write(f"APPLIKU_APP_ID={app_id}\n")
+    else:
+        with env_file.open("a") as f:
+            f.write(f"APPLIKU_APP_ID={app_id}\n")
+    logger.info("APPLIKU_APP_ID=%s saved to %s", app_id, env_file)
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
@@ -49,17 +75,14 @@ def _prompt_and_write(env_file: Path) -> dict[str, str]:
     print(f"No {ENV_FILENAME} found. Please enter your Appliku credentials:")
     api_key = input("APPLIKU_API_KEY: ").strip()
     team_path = input("APPLIKU_TEAM_PATH: ").strip()
-    app_id = input("APPLIKU_APP_ID: ").strip()
 
     values = {
         "APPLIKU_API_KEY": api_key,
         "APPLIKU_TEAM_PATH": team_path,
-        "APPLIKU_APP_ID": app_id,
     }
     env_file.write_text(
         f"APPLIKU_API_KEY={api_key}\n"
         f"APPLIKU_TEAM_PATH={team_path}\n"
-        f"APPLIKU_APP_ID={app_id}\n"
     )
     logger.info("Credentials written to %s", env_file)
     return values

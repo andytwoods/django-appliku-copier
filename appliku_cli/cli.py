@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from appliku_cli.api import ApplikuClient
+from appliku_cli.app_setup import ensure_app_id
 from appliku_cli.credentials import load_credentials
 from appliku_cli.provision import run_provision
 
@@ -39,6 +41,16 @@ def main() -> None:
 
     answers = _load_answers(args.copier_answers_file)
     credentials = load_credentials()
+
+    client = ApplikuClient(
+        api_key=credentials.api_key,
+        team_path=credentials.team_path,
+        app_id=credentials.app_id,
+    )
+
+    # Resolve or create the Appliku app before provisioning
+    ensure_app_id(credentials, client, answers)
+
     run_provision(credentials, answers)
     print("Appliku setup complete.")
 
