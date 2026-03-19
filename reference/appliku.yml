@@ -1,0 +1,28 @@
+# REFERENCE FILE — not a template
+# Plain Django + Postgres, no workers, no Redis.
+# This is the ground truth used to derive template/appliku.yml.jinja.
+
+build_settings:
+  build_image: dockerfile
+  dockerfile_path: Dockerfile
+  container_port: 8000
+  release_command: bash release.sh
+  environment_variables:
+    - name: DATABASE_URL
+      from_database:
+        name: db
+        property: private_connection_url
+    - name: ALLOWED_HOSTS
+      from_domains: true
+    - name: SECRET_KEY
+      source: manual
+    - name: WEB_CONCURRENCY
+      value: "2"
+
+services:
+  web:
+    command: bash run.sh
+
+databases:
+  db:
+    type: postgresql_17
