@@ -1,0 +1,110 @@
+_min_copier_version: "9.0"
+
+# ── Project identity ──────────────────────────────────────────────────────────
+
+project_name:
+    type: str
+    help: "Human-readable project name (e.g. My App)"
+
+project_slug:
+    type: str
+    help: "Python module name used in wsgi/asgi paths (e.g. my_app)"
+    default: "{{ project_name | lower | replace(' ', '_') | replace('-', '_') }}"
+
+python_version:
+    type: str
+    help: "Python version for the Dockerfile base image (e.g. 3.12)"
+    default: "3.12"
+
+# ── Database ──────────────────────────────────────────────────────────────────
+
+db_type:
+    type: str
+    help: "Database type to provision on Appliku"
+    choices:
+        - postgresql_18
+        - postgresql_17
+        - postgresql_16
+        - postgresql_15
+        - postgis_16_34
+        - postgresql_16_pgvector
+        - timescale_db_17
+        - mysql_8
+    default: postgresql_17
+
+# ── Task runner ───────────────────────────────────────────────────────────────
+
+task_runner:
+    type: str
+    help: "Task runner (none / celery / huey)"
+    choices:
+        - none
+        - celery
+        - huey
+    default: none
+
+celery_broker:
+    type: str
+    help: "Celery message broker"
+    choices:
+        - redis
+        - rabbitmq
+    default: redis
+    when: "{{ task_runner == 'celery' }}"
+
+redis_version:
+    type: str
+    help: "Redis version to provision on Appliku"
+    choices:
+        - "8"
+        - "7"
+        - "6"
+    default: "8"
+    when: "{{ task_runner != 'none' and (task_runner == 'huey' or celery_broker == 'redis') }}"
+
+use_beat:
+    type: bool
+    help: "Add a Celery beat scheduler process?"
+    default: false
+    when: "{{ task_runner == 'celery' }}"
+
+# ── Storage ───────────────────────────────────────────────────────────────────
+
+media_storage:
+    type: str
+    help: "Media file storage backend"
+    choices:
+        - none
+        - s3_compatible
+        - volume
+    default: none
+
+# ── Email ─────────────────────────────────────────────────────────────────────
+
+email_backend:
+    type: str
+    help: "Email backend"
+    choices:
+        - console
+        - smtp
+        - sendgrid
+        - mailgun
+        - ses
+    default: console
+
+# ── Error tracking ────────────────────────────────────────────────────────────
+
+use_sentry:
+    type: bool
+    help: "Configure Sentry error tracking?"
+    default: false
+
+# ── Post-generation cleanup ───────────────────────────────────────────────────
+
+_tasks:
+    - >-
+        python -c "
+        import pathlib;
+        files = [pathlib.Path('celery-worker.sh'), pathlib.Path('celery-beat.sh')];
+        [f.unlink() for f in files if f.exists() and not f.read_text().strip()]
+        "
