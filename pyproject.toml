@@ -25,5 +25,8 @@ dev = [
     "psycopg2-binary>=2.9",
 ]
 
+[tool.setuptools.packages.find]
+include = ["appliku_cli*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

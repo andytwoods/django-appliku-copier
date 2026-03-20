@@ -6,6 +6,8 @@ Run from the repo root:
 import subprocess
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE_DIR = REPO_ROOT / "template"
 EXAMPLE_DIR = REPO_ROOT / "example" / "demo_project"
@@ -55,6 +57,15 @@ def main() -> None:
         ],
         check=True,
     )
+    # Copier skips writing .copier-answers.yml when the template has no git tag.
+    # Write it explicitly so `appliku-setup` can find the answers.
+    answers_file = EXAMPLE_DIR / ".copier-answers.yml"
+    answers = {"_src_path": str(TEMPLATE_DIR), **COPIER_DATA}
+    with answers_file.open("w") as f:
+        f.write("# Changes here will be overwritten by Copier\n")
+        yaml.dump(answers, f, default_flow_style=False, allow_unicode=True)
+    print(f"Wrote {answers_file.relative_to(REPO_ROOT)}")
+
     print("Regeneration complete.")
 
 

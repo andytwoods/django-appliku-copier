@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.appliku.com)",
+      "Bash(curl -s -o \"C:/Users/andyt/PycharmProjects/django-appliku-copier/APPLIKU.md\" https://appliku.com/llms.txt)",
+      "Bash(cmd /c \"dir /a C:\\\\Users\\\\andyt\\\\PycharmProjects\\\\django-appliku-copier\\\\example\\\\demo_project\")",
+      "Bash(cmd /c \"dir /a \\\\\"C:\\\\Users\\\\andyt\\\\PycharmProjects\\\\django-appliku-copier\\\\example\\\\demo_project\\\\\"\")",
+      "Bash(powershell -Command \"Get-ChildItem -Force 'C:\\\\Users\\\\andyt\\\\PycharmProjects\\\\django-appliku-copier\\\\example\\\\demo_project' | Select-Object Name\")"
+    ]
+  }
+}

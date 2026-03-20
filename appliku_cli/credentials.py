@@ -32,6 +32,19 @@ def load_credentials(cwd: Path | None = None) -> Credentials:
 
     _ensure_gitignored(base)
 
+    # Prompt for any required values that are missing or blank
+    changed = False
+    for key, prompt in [
+        ("APPLIKU_API_KEY", "APPLIKU_API_KEY"),
+        ("APPLIKU_TEAM_PATH", "APPLIKU_TEAM_PATH (find it in the Appliku dashboard URL, e.g. app.appliku.com/t/<slug>/)"),
+    ]:
+        if not values.get(key, "").strip():
+            values[key] = input(f"{prompt}: ").strip()
+            changed = True
+
+    if changed:
+        _write_env_file(env_file, values)
+
     raw_app_id = values.get("APPLIKU_APP_ID", "").strip()
     return Credentials(
         api_key=values["APPLIKU_API_KEY"],
@@ -74,18 +87,21 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 def _prompt_and_write(env_file: Path) -> dict[str, str]:
     print(f"No {ENV_FILENAME} found. Please enter your Appliku credentials:")
     api_key = input("APPLIKU_API_KEY: ").strip()
-    team_path = input("APPLIKU_TEAM_PATH: ").strip()
-
-    values = {
-        "APPLIKU_API_KEY": api_key,
-        "APPLIKU_TEAM_PATH": team_path,
-    }
-    env_file.write_text(
-        f"APPLIKU_API_KEY={api_key}\n"
-        f"APPLIKU_TEAM_PATH={team_path}\n"
-    )
-    logger.info("Credentials written to %s", env_file)
+    team_path = input(
+        "APPLIKU_TEAM_PATH (find it in the Appliku dashboard URL, e.g. app.appliku.com/t/<slug>/): "
+    ).strip()
+    values = {"APPLIKU_API_KEY": api_key, "APPLIKU_TEAM_PATH": team_path}
+    _write_env_file(env_file, values)
     return values
+
+
+def _write_env_file(env_file: Path, values: dict[str, str]) -> None:
+    lines = "\n".join(f"{k}={v}" for k, v in values.items() if k != "APPLIKU_APP_ID") + "\n"
+    app_id = values.get("APPLIKU_APP_ID", "").strip()
+    if app_id:
+        lines += f"APPLIKU_APP_ID={app_id}\n"
+    env_file.write_text(lines)
+    logger.info("Credentials written to %s", env_file)
 
 
 def _ensure_gitignored(base: Path) -> None:
