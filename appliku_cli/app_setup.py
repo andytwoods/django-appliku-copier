@@ -71,35 +71,45 @@ def _current_branch(cwd: Path) -> str:
         return "main"
 
 
-def _pick_cluster(client: ApplikuClient) -> int:
-    clusters = client.list_clusters()
-    if clusters:
-        if len(clusters) == 1:
-            logger.info("Using cluster %r (id=%s)", clusters[0]["name"], clusters[0]["id"])
-            return int(clusters[0]["id"])
-        print("\nAvailable clusters:")
-        for i, c in enumerate(clusters):
-            print(f"  [{i + 1}] {c['name']}  (id={c['id']}, apps={c.get('apps_count', '?')})")
-        while True:
-            choice = input(f"Select cluster [1–{len(clusters)}]: ").strip()
-            try:
-                idx = int(choice) - 1
-                if 0 <= idx < len(clusters):
-                    return int(clusters[idx]["id"])
-            except ValueError:
-                pass
-            print("Invalid choice, please try again.")
+def _pick_deployment_target(client: ApplikuClient) -> tuple[int | None, int | None]:
+    """Return (cluster_id, server_id) for the chosen deployment target.
 
-    # API returned no clusters — ask the user to enter the ID manually
-    print("\nCould not retrieve clusters from the Appliku API.")
-    print("Find your cluster ID at: https://app.appliku.com/clusters/")
-    print("(click your cluster — the ID is in the URL)")
+    Lists clusters and servers together and lets the user pick one.
+    Returns (cluster_id, None) for clusters, (None, server_id) for servers.
+    """
+    clusters = client.list_clusters()
+    servers = client.list_servers()
+
+    options = []
+    for c in clusters:
+        options.append(("cluster", int(c["id"]), c.get("name", f"Cluster {c['id']}")))
+    for s in servers:
+        options.append(("server", int(s["id"]), s.get("name", f"Server {s['id']}")))
+
+    if not options:
+        raise RuntimeError(
+            "No clusters or servers found on your Appliku account.\n"
+            "Add a server at: https://app.appliku.com/servers/"
+        )
+
+    if len(options) == 1:
+        kind, obj_id, name = options[0]
+        logger.info("Using %s %r (id=%s)", kind, name, obj_id)
+        return (obj_id, None) if kind == "cluster" else (None, obj_id)
+
+    print("\nWhere do you want to deploy?")
+    for i, (kind, obj_id, name) in enumerate(options):
+        print(f"  [{i + 1}] {name}  ({kind} id={obj_id})")
     while True:
-        raw = input("Cluster ID: ").strip()
+        choice = input(f"Select [1–{len(options)}]: ").strip()
         try:
-            return int(raw)
+            idx = int(choice) - 1
+            if 0 <= idx < len(options):
+                kind, obj_id, _ = options[idx]
+                return (obj_id, None) if kind == "cluster" else (None, obj_id)
         except ValueError:
-            print("Please enter a numeric cluster ID.")
+            pass
+        print("Invalid choice, please try again.")
 
 
 def _resolve_github_repo(client: ApplikuClient, repo_path: str) -> str:
@@ -138,7 +148,7 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
     logger.info("Detecting git remote in %s", cwd)
     provider, repo_path = detect_git_remote(cwd)
 
-    cluster_id = _pick_cluster(client)
+    cluster_id, server_id = _pick_deployment_target(client)
 
     if provider == "github":
         logger.info("Resolving GitHub repository: %s", repo_path)
@@ -147,6 +157,7 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
             name=app_name,
             branch=branch,
             cluster_id=cluster_id,
+            server_id=server_id,
             repository_provider="github",
             repository_name=resolved,
         )
@@ -158,6 +169,7 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
             name=app_name,
             branch=branch,
             cluster_id=cluster_id,
+            server_id=server_id,
             repository_provider="gitlab",
             gitlab_repository_id=gitlab_id,
         )
@@ -169,6 +181,7 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
             name=app_name,
             branch=branch,
             cluster_id=cluster_id,
+            server_id=server_id,
             repository_provider="custom",
             custom_git_url=custom_url,
         )

@@ -7,7 +7,7 @@ import pytest
 
 from appliku_cli.app_setup import (
     _current_branch,
-    _pick_cluster,
+    _pick_deployment_target,
     _resolve_github_repo,
     _resolve_gitlab_repo_id,
     _sanitize_app_name,
@@ -100,29 +100,42 @@ def test_current_branch_defaults_to_main_for_detached_head(tmp_path):
         assert _current_branch(tmp_path) == "main"
 
 
-# ── _pick_cluster ─────────────────────────────────────────────────────────────
+# ── _pick_deployment_target ───────────────────────────────────────────────────
 
-def test_pick_cluster_single_cluster():
+def test_pick_deployment_target_single_cluster():
     client = MagicMock()
     client.list_clusters.return_value = [{"id": 7, "name": "prod"}]
-    assert _pick_cluster(client) == 7
+    client.list_servers.return_value = []
+    cluster_id, server_id = _pick_deployment_target(client)
+    assert cluster_id == 7
+    assert server_id is None
 
 
-def test_pick_cluster_multiple_prompts_user():
-    client = MagicMock()
-    client.list_clusters.return_value = [
-        {"id": 7, "name": "prod", "apps_count": 3},
-        {"id": 8, "name": "staging", "apps_count": 1},
-    ]
-    with patch("builtins.input", return_value="2"):
-        assert _pick_cluster(client) == 8
-
-
-def test_pick_cluster_prompts_manually_when_empty():
+def test_pick_deployment_target_single_server():
     client = MagicMock()
     client.list_clusters.return_value = []
-    with patch("builtins.input", return_value="42"):
-        assert _pick_cluster(client) == 42
+    client.list_servers.return_value = [{"id": 3, "name": "my-vps"}]
+    cluster_id, server_id = _pick_deployment_target(client)
+    assert cluster_id is None
+    assert server_id == 3
+
+
+def test_pick_deployment_target_multiple_prompts_user():
+    client = MagicMock()
+    client.list_clusters.return_value = [{"id": 7, "name": "prod"}]
+    client.list_servers.return_value = [{"id": 3, "name": "my-vps"}]
+    with patch("builtins.input", return_value="2"):
+        cluster_id, server_id = _pick_deployment_target(client)
+    assert cluster_id is None
+    assert server_id == 3
+
+
+def test_pick_deployment_target_raises_when_empty():
+    client = MagicMock()
+    client.list_clusters.return_value = []
+    client.list_servers.return_value = []
+    with pytest.raises(RuntimeError, match="No clusters or servers"):
+        _pick_deployment_target(client)
 
 
 # ── _resolve_github_repo ──────────────────────────────────────────────────────
@@ -170,7 +183,7 @@ def _mock_git_detection(provider: str, repo: str | None, branch: str = "main"):
         "appliku_cli.app_setup",
         detect_git_remote=MagicMock(return_value=(provider, repo)),
         _current_branch=MagicMock(return_value=branch),
-        _pick_cluster=MagicMock(return_value=1),
+        _pick_deployment_target=MagicMock(return_value=(1, None)),
     )
 
 

@@ -63,6 +63,16 @@ class ApplikuClient:
             return result["results"]
         return result if isinstance(result, list) else []
 
+    def list_servers(self) -> list[dict]:
+        """GET /api/team/{team_path}/server_list"""
+        team_path = self._require_team_path()
+        logger.info("Listing servers for team %r", team_path)
+        url = f"{BASE_URL}/api/team/{team_path}/server_list"
+        result = self._check(self._session.get(url))
+        if isinstance(result, dict) and "results" in result:
+            return result["results"]
+        return result if isinstance(result, list) else []
+
     def list_github_repos(self) -> list[str]:
         """GET /api/github/repositories/ — returns list of 'owner/repo' strings."""
         logger.info("Listing GitHub repositories")
@@ -81,24 +91,28 @@ class ApplikuClient:
         self,
         name: str,
         branch: str,
-        cluster_id: int,
         repository_provider: str,
+        cluster_id: int | None = None,
+        server_id: int | None = None,
         repository_name: str | None = None,
         gitlab_repository_id: int | None = None,
         custom_git_url: str | None = None,
     ) -> dict:
         """POST /api/team/{team_path}/applications/create/"""
         team_path = self._require_team_path()
-        logger.info("Creating app name=%r branch=%r cluster=%s", name, branch, cluster_id)
+        logger.info("Creating app name=%r branch=%r", name, branch)
         url = f"{BASE_URL}/api/team/{team_path}/applications/create/"
         payload: dict = {
             "name": name,
             "branch": branch,
-            "cluster": cluster_id,
             "build_pack": "dockerfile",
             "yml_config_file_path": "appliku.yml",
             "repository_provider": repository_provider,
         }
+        if cluster_id is not None:
+            payload["cluster"] = cluster_id
+        if server_id is not None:
+            payload["server"] = server_id
         if repository_name is not None:
             payload["repository_name"] = repository_name
         if gitlab_repository_id is not None:
