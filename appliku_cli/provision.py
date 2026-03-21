@@ -144,5 +144,16 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
 
     # Step 7: Trigger first deployment
     logger.info("Step 7/7: Triggering first deployment")
-    result = client.trigger_deploy()
-    logger.info("Deployment triggered: %s", result)
+    client.trigger_deploy()
+
+    domains = client.list_domains()
+    print("\nAppliku setup complete.")
+    if domains:
+        urls = [f"https://{d}" for d in domains]
+        print(f"Your app will be available at: {', '.join(urls)}")
+    print(
+        "\nThe first build is now running. Monitor progress at:\n"
+        "  https://app.appliku.com\n"
+        "\nOnce the build succeeds, run your domain through Appliku's dashboard\n"
+        "to add a custom domain and SSL certificate."
+    )

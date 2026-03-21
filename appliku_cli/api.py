@@ -167,3 +167,13 @@ class ApplikuClient:
         logger.info("Triggering deployment for app_id=%s", app_id)
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/deploy"
         return self._check(self._session.post(url))
+
+    def list_domains(self) -> list[str]:
+        """GET /api/team/{team_path}/applications/{app_id}/domains — returns domain strings."""
+        team_path = self._require_team_path()
+        app_id = self._require_app_id()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/domains"
+        result = self._check(self._session.get(url))
+        if isinstance(result, list):
+            return [entry["domain"] for entry in result if entry.get("domain")]
+        return []
