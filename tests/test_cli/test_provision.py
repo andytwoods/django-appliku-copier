@@ -1,5 +1,6 @@
 """Tests for appliku_cli.provision — verifies correct call sequence per config."""
-from unittest.mock import MagicMock, call, patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -7,19 +8,21 @@ from appliku_cli.credentials import Credentials
 from appliku_cli.provision import _bool, run_provision
 
 CREDS = Credentials(api_key="key", team_path="team", app_id=1, server_id=1)
+CREDS_PROVISIONED = Credentials(api_key="key", team_path="team", app_id=1, server_id=1, provisioned=True)
 
-def _run(answers: dict, extra_prompts: list[str] | None = None, domains: list[str] | None = None) -> MagicMock:
+
+def _run(answers: dict, extra_prompts: list[str] | None = None, domains: list[str] | None = None, credentials: Credentials = CREDS) -> MagicMock:
     """Run provision with a mocked client and return the mock."""
     prompts = iter(extra_prompts or [])
     mock_client = MagicMock()
-    mock_client.list_datastores.return_value = []
     mock_client.list_domains.return_value = domains or []
     with (
         patch("appliku_cli.provision.ApplikuClient", return_value=mock_client),
         patch("appliku_cli.provision._prompt", side_effect=prompts),
         patch("appliku_cli.provision.time.sleep"),
+        patch("appliku_cli.provision.save_provisioned"),
     ):
-        run_provision(CREDS, answers)
+        run_provision(credentials, answers, cwd=Path("/tmp"))
     return mock_client
 
 
@@ -46,22 +49,38 @@ def test_bool_coercion(value, expected):
     assert _bool(value) == expected
 
 
-# ── Baseline: no workers, no extras ──────────────────────────────────────────
+# ── Already-provisioned guard ─────────────────────────────────────────────────
 
-def test_baseline_provisions_db_only():
-    client = _run({"db_type": "postgresql_17", "task_runner": "none"})
-    client.create_datastore.assert_called_once_with(name="db", store_type="postgresql_17", server_id=1, cluster_id=None)
-    client.create_volume.assert_not_called()
+def test_provisioned_guard_aborts(capsys):
+    client = _run({"db_type": "postgresql_18", "task_runner": "none"}, credentials=CREDS_PROVISIONED)
+    client.trigger_deploy.assert_not_called()
+    client.set_config_vars.assert_not_called()
+    assert "already been provisioned" in capsys.readouterr().out
 
+
+# ── Baseline ──────────────────────────────────────────────────────────────────
 
 def test_baseline_sets_secret_key():
-    client = _run({"db_type": "postgresql_17", "task_runner": "none"})
+    client = _run({"db_type": "postgresql_18", "task_runner": "none"})
     assert "SECRET_KEY" in _all_pushed_vars(client)
 
 
+def test_baseline_triggers_deploy():
+    client = _run({"db_type": "postgresql_18", "task_runner": "none"})
+    client.trigger_deploy.assert_called_once()
+
+
+def test_baseline_does_not_create_datastore():
+    """Datastores are handled by appliku.yml — not via API."""
+    client = _run({"db_type": "postgresql_18", "task_runner": "none"})
+    client.create_datastore.assert_not_called()
+
+
+# ── Domain injection ──────────────────────────────────────────────────────────
+
 def test_domains_push_allowed_hosts():
     client = _run(
-        {"db_type": "postgresql_17", "task_runner": "none"},
+        {"db_type": "postgresql_18", "task_runner": "none"},
         domains=["myapp.appliku.app"],
     )
     vars = _all_pushed_vars(client)
@@ -70,84 +89,8 @@ def test_domains_push_allowed_hosts():
 
 
 def test_no_domains_skips_allowed_hosts():
-    client = _run({"db_type": "postgresql_17", "task_runner": "none"})
+    client = _run({"db_type": "postgresql_18", "task_runner": "none"})
     assert "ALLOWED_HOSTS" not in _all_pushed_vars(client)
-
-
-def test_baseline_triggers_deploy():
-    client = _run({"db_type": "postgresql_17", "task_runner": "none"})
-    client.trigger_deploy.assert_called_once()
-
-
-# ── Celery + Redis ────────────────────────────────────────────────────────────
-
-def test_celery_redis_provisions_cache():
-    client = _run({
-        "db_type": "postgresql_17",
-        "task_runner": "celery",
-        "celery_broker": "redis",
-        "redis_version": "8",
-    })
-    calls = [c for c in client.create_datastore.call_args_list]
-    store_types = [c.kwargs["store_type"] for c in calls]
-    assert "postgresql_17" in store_types
-    assert "redis_8" in store_types
-
-
-def test_celery_redis_no_rabbitmq():
-    client = _run({
-        "db_type": "postgresql_17",
-        "task_runner": "celery",
-        "celery_broker": "redis",
-        "redis_version": "8",
-    })
-    store_types = [c.kwargs["store_type"] for c in client.create_datastore.call_args_list]
-    assert "rabbitmq" not in store_types
-
-
-# ── Celery + RabbitMQ ─────────────────────────────────────────────────────────
-
-def test_celery_rabbitmq_provisions_broker_not_redis():
-    client = _run({
-        "db_type": "postgresql_17",
-        "task_runner": "celery",
-        "celery_broker": "rabbitmq",
-        "redis_version": "8",
-    })
-    store_types = [c.kwargs["store_type"] for c in client.create_datastore.call_args_list]
-    assert "rabbitmq" in store_types
-    assert not any(s.startswith("redis_") for s in store_types)
-
-
-# ── Huey ─────────────────────────────────────────────────────────────────────
-
-def test_huey_provisions_redis():
-    client = _run({
-        "db_type": "postgresql_17",
-        "task_runner": "huey",
-        "redis_version": "7",
-    })
-    store_types = [c.kwargs["store_type"] for c in client.create_datastore.call_args_list]
-    assert "redis_7" in store_types
-    assert "rabbitmq" not in store_types
-
-
-# ── PostGIS ───────────────────────────────────────────────────────────────────
-
-def test_postgis_db_type_passed_correctly():
-    client = _run({"db_type": "postgis_16_34", "task_runner": "none"})
-    client.create_datastore.assert_called_once_with(name="db", store_type="postgis_16_34", server_id=1, cluster_id=None)
-
-
-# ── Media storage: volume ─────────────────────────────────────────────────────
-
-def test_media_volume_creates_volume():
-    client = _run({
-        "db_type": "postgresql_17",
-        "task_runner": "none",
-        "media_storage": "volume",
-    })
-    client.create_volume.assert_called_once_with(name="media", target="/app/media/")
 
 
 # ── Media storage: S3 ────────────────────────────────────────────────────────
@@ -155,7 +98,7 @@ def test_media_volume_creates_volume():
 def test_s3_storage_pushes_aws_vars():
     client = _run(
         {
-            "db_type": "postgresql_17",
+            "db_type": "postgresql_18",
             "task_runner": "none",
             "media_storage": "s3_compatible",
         },
@@ -171,14 +114,14 @@ def test_s3_storage_pushes_aws_vars():
 
 def test_sentry_pushes_dsn():
     client = _run(
-        {"db_type": "postgresql_17", "task_runner": "none", "use_sentry": True},
+        {"db_type": "postgresql_18", "task_runner": "none", "use_sentry": True},
         extra_prompts=["https://sentry.io/dsn"],
     )
     assert "SENTRY_DSN" in _all_pushed_vars(client)
 
 
 def test_sentry_false_does_not_push_dsn():
-    client = _run({"db_type": "postgresql_17", "task_runner": "none", "use_sentry": False})
+    client = _run({"db_type": "postgresql_18", "task_runner": "none", "use_sentry": False})
     assert "SENTRY_DSN" not in _all_pushed_vars(client)
 
 
@@ -186,7 +129,7 @@ def test_sentry_false_does_not_push_dsn():
 
 def test_email_smtp_pushes_email_vars():
     client = _run(
-        {"db_type": "postgresql_17", "task_runner": "none", "email_backend": "smtp"},
+        {"db_type": "postgresql_18", "task_runner": "none", "email_backend": "smtp"},
         extra_prompts=["smtp.example.com", "587", "user@example.com", "pass"],
     )
     all_vars = _all_pushed_vars(client)
@@ -195,5 +138,5 @@ def test_email_smtp_pushes_email_vars():
 
 
 def test_email_console_does_not_push_email_vars():
-    client = _run({"db_type": "postgresql_17", "task_runner": "none", "email_backend": "console"})
+    client = _run({"db_type": "postgresql_18", "task_runner": "none", "email_backend": "console"})
     assert "EMAIL_HOST" not in _all_pushed_vars(client)

@@ -17,6 +17,7 @@ class Credentials:
     app_id: int | None  # None until ensure_app_id() resolves it
     server_id: int | None = None   # set when app is deployed to a server
     cluster_id: int | None = None  # set when app is deployed to a cluster
+    provisioned: bool = False      # True after successful appliku-setup run
 
 
 def load_credentials(cwd: Path | None = None) -> Credentials:
@@ -53,6 +54,7 @@ def load_credentials(cwd: Path | None = None) -> Credentials:
         app_id=int(raw_app_id) if raw_app_id else None,
         server_id=int(raw_server_id) if raw_server_id else None,
         cluster_id=int(raw_cluster_id) if raw_cluster_id else None,
+        provisioned=values.get("APPLIKU_PROVISIONED", "").strip().lower() == "true",
     )
 
 
@@ -104,6 +106,16 @@ def save_app_id(app_id: int, cwd: Path | None = None) -> None:
     logger.info("APPLIKU_APP_ID=%s saved to %s", app_id, env_file)
 
 
+def save_provisioned(cwd: Path | None = None) -> None:
+    """Mark this app as fully provisioned in .env.appliku."""
+    base = cwd or Path.cwd()
+    env_file = base / ENV_FILENAME
+    values = _parse_env_file(env_file) if env_file.exists() else {}
+    values["APPLIKU_PROVISIONED"] = "true"
+    _write_env_file(env_file, values)
+    logger.info("APPLIKU_PROVISIONED=true saved to %s", env_file)
+
+
 def _parse_env_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     for line in path.read_text().splitlines():
@@ -124,7 +136,7 @@ def _prompt_and_write(env_file: Path) -> dict[str, str]:
     return values
 
 
-_TRAILING_KEYS = ("APPLIKU_APP_ID", "APPLIKU_SERVER_ID", "APPLIKU_CLUSTER_ID")
+_TRAILING_KEYS = ("APPLIKU_APP_ID", "APPLIKU_SERVER_ID", "APPLIKU_CLUSTER_ID", "APPLIKU_PROVISIONED")
 
 
 def _write_env_file(env_file: Path, values: dict[str, str]) -> None:

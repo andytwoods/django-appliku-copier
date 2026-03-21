@@ -10,7 +10,8 @@
       "Bash(python:*)",
       "WebFetch(domain:appliku.com)",
       "Bash(uv pip:*)",
-      "Bash(/Users/andytwoods/PycharmProjects/DjangoAppliku/README.md:*)"
+      "Bash(/Users/andytwoods/PycharmProjects/DjangoAppliku/README.md:*)",
+      "Bash(uv lock:*)"
     ]
   }
 }

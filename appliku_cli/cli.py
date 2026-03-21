@@ -53,7 +53,7 @@ def main() -> None:
     ensure_app_id(credentials, client, answers)
 
     try:
-        run_provision(credentials, answers)
+        run_provision(credentials, answers, cwd=Path.cwd())
     except ApplikuAPIError as exc:
         if "doesn't exist" in exc.body or "does not exist" in exc.body:
             print(

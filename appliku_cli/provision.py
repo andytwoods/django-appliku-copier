@@ -3,9 +3,10 @@ import logging
 import secrets
 import sys
 import time
+from pathlib import Path
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
-from appliku_cli.credentials import Credentials, save_deployment_target
+from appliku_cli.credentials import Credentials, save_deployment_target, save_provisioned
 
 logger = logging.getLogger(__name__)
 
@@ -27,35 +28,17 @@ def _countdown(message: str, seconds: int) -> None:
     sys.stdout.flush()
 
 
-def _retry_on_500(label: str, fn, *args, wait: int = 5, **kwargs):
-    """Call fn(*args, **kwargs), retrying once after `wait` seconds on a 500."""
-    for attempt in range(2):
+def _retry_on_500(label: str, fn, *args, wait: int = 10, retries: int = 3, **kwargs):
+    """Call fn(*args, **kwargs), retrying up to `retries` times on a 500."""
+    for attempt in range(retries):
         try:
             return fn(*args, **kwargs)
         except ApplikuAPIError as e:
-            if e.status_code == 500 and attempt == 0:
-                print(f"  Appliku not ready yet — retrying in {wait}s…")
+            if e.status_code == 500 and attempt < retries - 1:
+                print(f"  Appliku not ready yet — retrying in {wait}s… (attempt {attempt + 1}/{retries - 1})")
                 _countdown("Waiting", wait)
             else:
                 raise
-
-
-def _create_datastore(
-    client: ApplikuClient,
-    name: str,
-    store_type: str,
-    server_id: int | None = None,
-    cluster_id: int | None = None,
-) -> None:
-    """Create a datastore, retrying once on 500 (Appliku sometimes needs a moment)."""
-    _retry_on_500(
-        "Datastore creation",
-        client.create_datastore,
-        name=name,
-        store_type=store_type,
-        server_id=server_id,
-        cluster_id=cluster_id,
-    )
 
 
 def _prompt(label: str, default: str | None = None) -> str:
@@ -65,82 +48,51 @@ def _prompt(label: str, default: str | None = None) -> str:
     return value if value else (default or "")
 
 
-def run_provision(credentials: Credentials, answers: dict) -> None:
-    """Run the full Appliku provisioning sequence for a project."""
+def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = None) -> None:
+    """Run the full Appliku provisioning sequence for a project.
+
+    Database and cache provisioning is handled declaratively by the `databases:`
+    section in appliku.yml — Appliku auto-creates them when the app initialises.
+    This function only pushes config vars (secrets, optional integrations) and
+    triggers the first deployment.
+    """
+    cwd = cwd or Path.cwd()
+
+    if credentials.provisioned:
+        print(
+            "\nThis app has already been provisioned.\n"
+            "To start fresh:\n"
+            "  1. Delete the app at https://app.appliku.com\n"
+            f"  2. Remove APPLIKU_APP_ID and APPLIKU_PROVISIONED from .env.appliku\n"
+            "  3. Re-run appliku-setup"
+        )
+        return
+
     client = ApplikuClient(
         api_key=credentials.api_key,
         team_path=credentials.team_path,
         app_id=credentials.app_id,
     )
 
-    db_type: str = answers.get("db_type", "postgresql_17")
-    task_runner: str = answers.get("task_runner", "none")
-    celery_broker: str = answers.get("celery_broker", "redis")
-    redis_version: str = str(answers.get("redis_version", "8"))
     media_storage: str = answers.get("media_storage", "none")
     email_backend: str = answers.get("email_backend", "console")
     use_sentry: bool = _bool(answers.get("use_sentry", False))
+
+    # If neither server nor cluster is set (e.g. app was pre-existing), discover now
     server_id: int | None = credentials.server_id
     cluster_id: int | None = credentials.cluster_id
-
-    # If neither is set (e.g. app was pre-existing), discover the deployment target now
     if server_id is None and cluster_id is None:
         from appliku_cli.app_setup import _pick_deployment_target  # noqa: PLC0415
         logger.info("No server/cluster in credentials — detecting deployment target")
         cluster_id, server_id = _pick_deployment_target(client)
-        save_deployment_target(server_id=server_id, cluster_id=cluster_id)
-        credentials.server_id = server_id
-        credentials.cluster_id = cluster_id
-
-    needs_redis = task_runner != "none" and (
-        task_runner == "huey" or celery_broker == "redis"
-    )
-
-    # Guard: abort if the app already has datastores (means it was already provisioned)
-    existing = client.list_datastores()
-    if existing:
-        print(
-            "\nThis app has already been provisioned (datastores already exist).\n"
-            "To start fresh:\n"
-            "  1. Delete the app at https://app.appliku.com\n"
-            f"  2. Remove APPLIKU_APP_ID from .env.appliku\n"
-            "  3. Re-run appliku-setup"
-        )
-        return
-
-    # Brief pause to allow Appliku to finish setting up the newly created app
-    _countdown("Waiting for Appliku to initialise the app", 8)
-
-    print("[1/7] Provisioning database…")
-    _create_datastore(client, name="db", store_type=db_type, server_id=server_id, cluster_id=cluster_id)
-    print(f"      ✓ {db_type} database ready")
-
-    if needs_redis:
-        redis_store_type = f"redis_{redis_version}"
-        print(f"[2/7] Provisioning Redis ({redis_store_type})…")
-        _create_datastore(client, name="cache", store_type=redis_store_type, server_id=server_id, cluster_id=cluster_id)
-        print(f"      ✓ Redis ready")
-    else:
-        print("[2/7] Redis — not required, skipping")
-
-    if task_runner == "celery" and celery_broker == "rabbitmq":
-        print("[3/7] Provisioning RabbitMQ…")
-        _create_datastore(client, name="broker", store_type="rabbitmq", server_id=server_id, cluster_id=cluster_id)
-        print("      ✓ RabbitMQ ready")
-    else:
-        print("[3/7] RabbitMQ — not required, skipping")
-
-    if media_storage == "volume":
-        print("[4/7] Provisioning media volume…")
-        client.create_volume(name="media", target="/app/media/")
-        print("      ✓ Volume ready")
-    else:
-        print("[4/7] Media volume — not required, skipping")
+        save_deployment_target(server_id=server_id, cluster_id=cluster_id, cwd=cwd)
 
     def push_vars(vars: dict) -> None:
         _retry_on_500("Config vars", client.set_config_vars, vars)
 
-    print("[5/7] Pushing config vars…")
+    step = 1
+
+    print(f"[{step}/2] Pushing config vars…")
     config_vars: dict[str, str] = {"SECRET_KEY": secrets.token_urlsafe(50)}
     domains = client.list_domains()
     if domains:
@@ -148,9 +100,10 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
         config_vars["CSRF_TRUSTED_ORIGINS"] = ",".join(f"https://{d}" for d in domains)
     push_vars(config_vars)
     print("      ✓ Done")
+    step += 1
 
     if media_storage == "s3_compatible":
-        print("[6/7] Configuring S3-compatible storage…")
+        print(f"[{step}/2] Configuring S3-compatible storage…")
         push_vars({
             "AWS_ACCESS_KEY_ID": _prompt("AWS_ACCESS_KEY_ID"),
             "AWS_SECRET_ACCESS_KEY": _prompt("AWS_SECRET_ACCESS_KEY"),
@@ -159,7 +112,7 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
         })
         print("      ✓ Done")
     if email_backend != "console":
-        print(f"[6/7] Configuring email ({email_backend})…")
+        print(f"[{step}/2] Configuring email ({email_backend})…")
         push_vars({
             "EMAIL_HOST": _prompt("EMAIL_HOST"),
             "EMAIL_PORT": _prompt("EMAIL_PORT", default="587"),
@@ -168,12 +121,14 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
         })
         print("      ✓ Done")
     if use_sentry:
-        print("[6/7] Configuring Sentry…")
+        print(f"[{step}/2] Configuring Sentry…")
         push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
         print("      ✓ Done")
 
-    print("[7/7] Triggering first deployment…")
+    print(f"[2/2] Triggering first deployment…")
     client.trigger_deploy()
+
+    save_provisioned(cwd=cwd)
 
     print("\nAppliku setup complete.")
     if domains:
