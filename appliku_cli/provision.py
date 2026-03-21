@@ -163,9 +163,19 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     if domains:
         urls = [f"https://{d}" for d in domains]
         print(f"Your app will be available at: {', '.join(urls)}")
+        print(
+            "\nIMPORTANT: ensure your Django settings read ALLOWED_HOSTS from the\n"
+            "environment, e.g.:\n"
+            "\n"
+            "    ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])\n"
+            "\n"
+            "The appliku.yml injects the domain automatically via 'from_domains: true',\n"
+            f"so {', '.join(domains)} will be added for you — but only if settings.py\n"
+            "reads ALLOWED_HOSTS from the environment."
+        )
     print(
         "\nThe first build is now running. Monitor progress at:\n"
         "  https://app.appliku.com\n"
-        "\nOnce the build succeeds, run your domain through Appliku's dashboard\n"
-        "to add a custom domain and SSL certificate."
+        "\nOnce the build succeeds you can add a custom domain and SSL certificate\n"
+        "from the Appliku dashboard."
     )
