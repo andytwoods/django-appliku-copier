@@ -34,8 +34,11 @@ def load_credentials(cwd: Path | None = None) -> Credentials:
 
     # Prompt for API key if missing
     if not values.get("APPLIKU_API_KEY", "").strip():
+        print(f"APPLIKU_API_KEY not found in {ENV_FILENAME}.")
+        print("Find yours at: Appliku → Account → API Keys")
         values["APPLIKU_API_KEY"] = input("APPLIKU_API_KEY: ").strip()
         _write_env_file(env_file, values)
+        print(f"Saved to {ENV_FILENAME}.")
 
     raw_team = values.get("APPLIKU_TEAM_PATH", "").strip()
     raw_app_id = values.get("APPLIKU_APP_ID", "").strip()
@@ -88,10 +91,12 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
 
 def _prompt_and_write(env_file: Path) -> dict[str, str]:
-    print(f"No {ENV_FILENAME} found. Please enter your Appliku API key:")
+    print(f"No {ENV_FILENAME} found.")
+    print("Find your API key at: Appliku → Account → API Keys")
     api_key = input("APPLIKU_API_KEY: ").strip()
     values = {"APPLIKU_API_KEY": api_key}
     _write_env_file(env_file, values)
+    print(f"Saved to {ENV_FILENAME} (gitignored).")
     return values
 
 
