@@ -74,7 +74,11 @@ def _current_branch(cwd: Path) -> str:
 def _pick_cluster(client: ApplikuClient) -> int:
     clusters = client.list_clusters()
     if not clusters:
-        raise RuntimeError("No clusters found on your Appliku account.")
+        raise RuntimeError(
+            "No clusters found on your Appliku account.\n"
+            "A cluster is a server that Appliku deploys your app to.\n"
+            "Add one at: https://app.appliku.com/clusters/"
+        )
     if len(clusters) == 1:
         logger.info("Using cluster %r (id=%s)", clusters[0]["name"], clusters[0]["id"])
         return int(clusters[0]["id"])
