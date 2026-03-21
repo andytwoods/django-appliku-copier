@@ -206,9 +206,90 @@ reference/          Hand-written reference files (ground truth, not deployed)
 tests/              Snapshot tests, YAML validation, Django check
 ```
 
-To regenerate the example project after changing templates:
+---
+
+## Contributing / developing this package
+
+### Setup
 
 ```bash
-python scripts/regenerate_example.py
+git clone https://github.com/andytwoods/djangoappliku
+cd djangoappliku
+uv sync --group dev
+```
+
+### Running the tests
+
+```bash
 uv run --group dev pytest
 ```
+
+The test suite has three layers:
+
+**Template tests** (`tests/test_snapshots.py`, `tests/test_yaml.py`) — run
+`copier copy` for each combination in the test matrix and verify the output.
+These cover all 9 combinations of database, task runner, storage, and email
+options defined in `OVERVIEW.md`:
+
+```bash
+uv run --group dev pytest tests/test_snapshots.py tests/test_yaml.py -v
+```
+
+**Django check** (`tests/test_django_check.py`) — runs `manage.py check` on
+the committed example project to verify the generated files produce a valid
+Django configuration:
+
+```bash
+uv run --group dev pytest tests/test_django_check.py -v
+```
+
+**CLI tests** (`tests/test_cli/`) — unit tests for the `appliku-setup` command:
+credentials loading, API client, git remote detection, team/app resolution,
+and provisioning logic. All HTTP calls are mocked:
+
+```bash
+uv run --group dev pytest tests/test_cli/ -v
+```
+
+### Changing a template
+
+1. Edit the relevant `.jinja` file in `template/`
+2. Regenerate the example project to see the result:
+   ```bash
+   python scripts/regenerate_example.py
+   ```
+3. Inspect the diff on the generated files in `example/demo_project/`
+4. Run the full test suite:
+   ```bash
+   uv run --group dev pytest
+   ```
+5. If `appliku.yml` snapshots need updating (expected change):
+   ```bash
+   uv run --group dev pytest tests/test_snapshots.py --snapshot-update
+   ```
+
+### Testing `appliku-setup` against a real Appliku account
+
+Install the package in editable mode:
+
+```bash
+uv pip install -e .
+```
+
+Then run it from inside any Django project that has a `.copier-answers.yml`:
+
+```bash
+cd /path/to/your/django/project
+appliku-setup
+```
+
+It will prompt for your API key on first run and save it to `.env.appliku`.
+To reset and start fresh, delete `.env.appliku`.
+
+### Adding a new Copier question
+
+1. Add the variable to `template/copier.yml` with a `when:` condition if needed
+2. Update the relevant `.jinja` templates to use it
+3. Add the variable to `BASE_DATA` in `tests/conftest.py`
+4. Add a test case to the matrix in `tests/conftest.py` if it affects generated output
+5. Update the README table in the "Step 1" section
