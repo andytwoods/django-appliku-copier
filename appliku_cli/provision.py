@@ -16,6 +16,19 @@ def _bool(value: object) -> bool:
     return str(value).strip().lower() in ("true", "1", "yes")
 
 
+def _retry_on_500(label: str, fn, *args, wait: int = 5, **kwargs):
+    """Call fn(*args, **kwargs), retrying once after `wait` seconds on a 500."""
+    for attempt in range(2):
+        try:
+            return fn(*args, **kwargs)
+        except ApplikuAPIError as e:
+            if e.status_code == 500 and attempt == 0:
+                logger.warning("%s got 500 — waiting %ss and retrying", label, wait)
+                time.sleep(wait)
+            else:
+                raise
+
+
 def _create_datastore(
     client: ApplikuClient,
     name: str,
@@ -24,21 +37,14 @@ def _create_datastore(
     cluster_id: int | None = None,
 ) -> None:
     """Create a datastore, retrying once on 500 (Appliku sometimes needs a moment)."""
-    for attempt in range(2):
-        try:
-            client.create_datastore(
-                name=name,
-                store_type=store_type,
-                server_id=server_id,
-                cluster_id=cluster_id,
-            )
-            return
-        except ApplikuAPIError as e:
-            if e.status_code == 500 and attempt == 0:
-                logger.warning("Datastore creation got 500 — waiting 5s and retrying")
-                time.sleep(5)
-            else:
-                raise
+    _retry_on_500(
+        "Datastore creation",
+        client.create_datastore,
+        name=name,
+        store_type=store_type,
+        server_id=server_id,
+        cluster_id=cluster_id,
+    )
 
 
 def _prompt(label: str, default: str | None = None) -> str:
@@ -108,28 +114,29 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     else:
         logger.info("Step 4/11: Media volume not required — skipping")
 
+    def push_vars(vars: dict) -> None:
+        _retry_on_500("Config vars", client.set_config_vars, vars)
+
     # Step 5: SECRET_KEY
     logger.info("Step 5/11: Generating and pushing SECRET_KEY")
-    secret_key = secrets.token_urlsafe(50)
-    client.set_config_vars({"SECRET_KEY": secret_key})
+    push_vars({"SECRET_KEY": secrets.token_urlsafe(50)})
 
     # Step 6: Domain → ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS
     logger.info("Step 6/11: Configuring domain")
     domain = _prompt("Domain (e.g. myapp.example.com)")
-    client.set_config_vars({
+    push_vars({
         "ALLOWED_HOSTS": domain,
         "CSRF_TRUSTED_ORIGINS": f"https://{domain}",
     })
 
     # Step 7: WEB_CONCURRENCY
     logger.info("Step 7/11: Setting WEB_CONCURRENCY")
-    concurrency = _prompt("WEB_CONCURRENCY", default="2")
-    client.set_config_vars({"WEB_CONCURRENCY": concurrency})
+    push_vars({"WEB_CONCURRENCY": _prompt("WEB_CONCURRENCY", default="2")})
 
     # Step 8: S3-compatible storage
     if media_storage == "s3_compatible":
         logger.info("Step 8/11: Configuring S3-compatible storage")
-        client.set_config_vars({
+        push_vars({
             "AWS_ACCESS_KEY_ID": _prompt("AWS_ACCESS_KEY_ID"),
             "AWS_SECRET_ACCESS_KEY": _prompt("AWS_SECRET_ACCESS_KEY"),
             "AWS_STORAGE_BUCKET_NAME": _prompt("AWS_STORAGE_BUCKET_NAME"),
@@ -141,7 +148,7 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     # Step 9: Email
     if email_backend != "console":
         logger.info("Step 9/11: Configuring email backend (%s)", email_backend)
-        client.set_config_vars({
+        push_vars({
             "EMAIL_HOST": _prompt("EMAIL_HOST"),
             "EMAIL_PORT": _prompt("EMAIL_PORT", default="587"),
             "EMAIL_HOST_USER": _prompt("EMAIL_HOST_USER"),
@@ -153,7 +160,7 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     # Step 10: Sentry
     if use_sentry:
         logger.info("Step 10/11: Configuring Sentry")
-        client.set_config_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
+        push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
     else:
         logger.info("Step 10/11: Sentry not enabled — skipping")
 
