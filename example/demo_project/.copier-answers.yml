@@ -1,0 +1,12 @@
+# Changes here will be overwritten by Copier
+_src_path: /Users/andytwoods/PycharmProjects/DjangoAppliku/template
+db_type: postgresql_17
+email_backend: console
+media_storage: none
+package_manager: pip
+project_name: Demo Project
+project_slug: config
+python_version: '3.13'
+task_runner: none
+use_sentry: 'false'
+web_server: gunicorn

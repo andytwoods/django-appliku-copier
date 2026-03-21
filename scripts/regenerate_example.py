@@ -24,7 +24,9 @@ GENERATED_FILES = [
 COPIER_DATA = {
     "project_name": "Demo Project",
     "project_slug": "config",
-    "python_version": "3.12",
+    "python_version": "3.13",
+    "package_manager": "pip",
+    "web_server": "gunicorn",
     "db_type": "postgresql_17",
     "task_runner": "none",
     "media_storage": "none",

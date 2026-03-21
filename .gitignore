@@ -55,6 +55,8 @@ example/demo_project/db.sqlite3
 
 # Copier internals (generated in target dirs, not here)
 .copier-answers.yml
+# ...except the example project's, which must be committed for appliku-setup to work
+!example/demo_project/.copier-answers.yml
 
 # Editors
 .idea/
