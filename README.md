@@ -295,3 +295,11 @@ To reset and start fresh, delete `.env.appliku`.
 3. Add the variable to `BASE_DATA` in `tests/conftest.py`
 4. Add a test case to the matrix in `tests/conftest.py` if it affects generated output
 5. Update the README table in the "Step 1" section
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Attribution
+
+Some template files were adapted from [SpeedPy](https://github.com/speedpy/speedpy).

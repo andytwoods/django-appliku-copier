@@ -2,6 +2,7 @@
 name = "djangoappliku"
 version = "0.1.0"
 description = "Copier-based scaffold for Django deployments on Appliku"
+license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31",
