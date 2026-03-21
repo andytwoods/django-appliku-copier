@@ -1,6 +1,7 @@
 """Read and write Appliku credentials from .env.appliku."""
 import dataclasses
 import logging
+import subprocess
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -111,12 +112,39 @@ def _write_env_file(env_file: Path, values: dict[str, str]) -> None:
 
 def _ensure_gitignored(base: Path) -> None:
     gitignore = base / GITIGNORE_FILENAME
+    added = False
+
     if not gitignore.exists():
         gitignore.write_text(f"{ENV_FILENAME}\n")
         logger.info("Created .gitignore with %s", ENV_FILENAME)
-        return
-    content = gitignore.read_text()
-    if ENV_FILENAME not in content:
-        with gitignore.open("a") as f:
-            f.write(f"\n{ENV_FILENAME}\n")
-        logger.info("Added %s to .gitignore", ENV_FILENAME)
+        added = True
+    else:
+        content = gitignore.read_text()
+        if ENV_FILENAME not in content:
+            with gitignore.open("a") as f:
+                f.write(f"\n{ENV_FILENAME}\n")
+            logger.info("Added %s to .gitignore", ENV_FILENAME)
+            added = True
+
+    if added:
+        print(f"\n*** WARNING: {ENV_FILENAME} has been added to .gitignore. ***")
+        print(f"*** It contains your Appliku API key — never commit it.   ***\n")
+
+    # Check whether git is already tracking the file (e.g. committed by mistake)
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", ENV_FILENAME],
+            cwd=base,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            print(f"\n{'!' * 60}")
+            print(f"  DANGER: {ENV_FILENAME} is tracked by git!")
+            print(f"  Your API key may already be in your commit history.")
+            print(f"  Remove it immediately:")
+            print(f"    git rm --cached {ENV_FILENAME}")
+            print(f"    git commit -m 'Remove {ENV_FILENAME} from tracking'")
+            print(f"  Then rotate your API key in Appliku → Account → API Keys.")
+            print(f"{'!' * 60}\n")
+    except FileNotFoundError:
+        pass  # git not available

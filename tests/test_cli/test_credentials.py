@@ -1,6 +1,6 @@
 """Tests for appliku_cli.credentials."""
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -104,11 +104,12 @@ def test_save_app_id_replaces_existing(tmp_path):
     assert "APPLIKU_APP_ID=0" not in content
 
 
-def test_ensure_gitignored_creates_gitignore(tmp_path):
+def test_ensure_gitignored_creates_gitignore(tmp_path, capsys):
     _ensure_gitignored(tmp_path)
     gitignore = tmp_path / GITIGNORE_FILENAME
     assert gitignore.exists()
     assert ENV_FILENAME in gitignore.read_text()
+    assert "WARNING" in capsys.readouterr().out
 
 
 def test_ensure_gitignored_appends_to_existing(tmp_path):
@@ -119,9 +120,29 @@ def test_ensure_gitignored_appends_to_existing(tmp_path):
     assert "*.pyc" in gitignore.read_text()
 
 
-def test_ensure_gitignored_idempotent(tmp_path):
+def test_ensure_gitignored_idempotent(tmp_path, capsys):
     gitignore = tmp_path / GITIGNORE_FILENAME
     gitignore.write_text(f"{ENV_FILENAME}\n")
     _ensure_gitignored(tmp_path)
     _ensure_gitignored(tmp_path)
     assert gitignore.read_text().count(ENV_FILENAME) == 1
+    # No warning when already gitignored
+    assert "WARNING" not in capsys.readouterr().out
+
+
+def test_ensure_gitignored_warns_if_git_tracked(tmp_path, capsys):
+    gitignore = tmp_path / GITIGNORE_FILENAME
+    gitignore.write_text(f"{ENV_FILENAME}\n")
+    mock_result = MagicMock(returncode=0)
+    with patch("appliku_cli.credentials.subprocess.run", return_value=mock_result):
+        _ensure_gitignored(tmp_path)
+    assert "DANGER" in capsys.readouterr().out
+
+
+def test_ensure_gitignored_no_danger_when_not_tracked(tmp_path, capsys):
+    gitignore = tmp_path / GITIGNORE_FILENAME
+    gitignore.write_text(f"{ENV_FILENAME}\n")
+    mock_result = MagicMock(returncode=1)
+    with patch("appliku_cli.credentials.subprocess.run", return_value=mock_result):
+        _ensure_gitignored(tmp_path)
+    assert "DANGER" not in capsys.readouterr().out
