@@ -4,7 +4,7 @@ import secrets
 import time
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
-from appliku_cli.credentials import Credentials
+from appliku_cli.credentials import Credentials, save_deployment_target
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,15 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     use_sentry: bool = _bool(answers.get("use_sentry", False))
     server_id: int | None = credentials.server_id
     cluster_id: int | None = credentials.cluster_id
+
+    # If neither is set (e.g. app was pre-existing), discover the deployment target now
+    if server_id is None and cluster_id is None:
+        from appliku_cli.app_setup import _pick_deployment_target  # noqa: PLC0415
+        logger.info("No server/cluster in credentials — detecting deployment target")
+        cluster_id, server_id = _pick_deployment_target(client)
+        save_deployment_target(server_id=server_id, cluster_id=cluster_id)
+        credentials.server_id = server_id
+        credentials.cluster_id = cluster_id
 
     needs_redis = task_runner != "none" and (
         task_runner == "huey" or celery_broker == "redis"

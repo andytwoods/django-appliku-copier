@@ -136,7 +136,7 @@ class ApplikuClient:
         app_id = self._require_app_id()
         logger.info("Creating datastore name=%r store_type=%r", name, store_type)
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/datastores"
-        payload: dict = {"name": name, "store_type": store_type, "is_default": True}
+        payload: dict = {"name": name, "store_type": store_type}
         if server_id is not None:
             payload["server"] = server_id
         if cluster_id is not None:

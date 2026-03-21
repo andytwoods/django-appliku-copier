@@ -116,7 +116,6 @@ def test_create_datastore_success(client):
     assert result["id"] == 1
     body = json.loads(responses_lib.calls[0].request.body)
     assert body["store_type"] == "postgresql_17"
-    assert body["is_default"] is True
 
 
 @responses_lib.activate
