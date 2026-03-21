@@ -86,7 +86,7 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     )
 
     # Brief pause to allow Appliku to finish setting up the newly created app
-    time.sleep(3)
+    time.sleep(8)
 
     # Step 1: Provision database
     logger.info("Step 1/11: Provisioning database (%s)", db_type)
@@ -118,53 +118,31 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
         _retry_on_500("Config vars", client.set_config_vars, vars)
 
     # Step 5: SECRET_KEY
-    logger.info("Step 5/11: Generating and pushing SECRET_KEY")
+    logger.info("Step 5/7: Generating and pushing SECRET_KEY")
     push_vars({"SECRET_KEY": secrets.token_urlsafe(50)})
 
-    # Step 6: Domain → ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS
-    logger.info("Step 6/11: Configuring domain")
-    domain = _prompt("Domain (e.g. myapp.example.com)")
-    push_vars({
-        "ALLOWED_HOSTS": domain,
-        "CSRF_TRUSTED_ORIGINS": f"https://{domain}",
-    })
-
-    # Step 7: WEB_CONCURRENCY
-    logger.info("Step 7/11: Setting WEB_CONCURRENCY")
-    push_vars({"WEB_CONCURRENCY": _prompt("WEB_CONCURRENCY", default="2")})
-
-    # Step 8: S3-compatible storage
+    # Step 6: Optional integrations (S3, email, Sentry)
     if media_storage == "s3_compatible":
-        logger.info("Step 8/11: Configuring S3-compatible storage")
+        logger.info("Step 6/7: Configuring S3-compatible storage")
         push_vars({
             "AWS_ACCESS_KEY_ID": _prompt("AWS_ACCESS_KEY_ID"),
             "AWS_SECRET_ACCESS_KEY": _prompt("AWS_SECRET_ACCESS_KEY"),
             "AWS_STORAGE_BUCKET_NAME": _prompt("AWS_STORAGE_BUCKET_NAME"),
             "AWS_S3_ENDPOINT_URL": _prompt("AWS_S3_ENDPOINT_URL"),
         })
-    else:
-        logger.info("Step 8/11: S3 storage not required — skipping")
-
-    # Step 9: Email
     if email_backend != "console":
-        logger.info("Step 9/11: Configuring email backend (%s)", email_backend)
+        logger.info("Step 6/7: Configuring email backend (%s)", email_backend)
         push_vars({
             "EMAIL_HOST": _prompt("EMAIL_HOST"),
             "EMAIL_PORT": _prompt("EMAIL_PORT", default="587"),
             "EMAIL_HOST_USER": _prompt("EMAIL_HOST_USER"),
             "EMAIL_HOST_PASSWORD": _prompt("EMAIL_HOST_PASSWORD"),
         })
-    else:
-        logger.info("Step 9/11: Email backend is console — skipping")
-
-    # Step 10: Sentry
     if use_sentry:
-        logger.info("Step 10/11: Configuring Sentry")
+        logger.info("Step 6/7: Configuring Sentry")
         push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
-    else:
-        logger.info("Step 10/11: Sentry not enabled — skipping")
 
-    # Step 11: Trigger first deployment
-    logger.info("Step 11/11: Triggering first deployment")
+    # Step 7: Trigger first deployment
+    logger.info("Step 7/7: Triggering first deployment")
     result = client.trigger_deploy()
     logger.info("Deployment triggered: %s", result)

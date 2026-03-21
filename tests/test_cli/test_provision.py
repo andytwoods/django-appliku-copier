@@ -8,13 +8,9 @@ from appliku_cli.provision import _bool, run_provision
 
 CREDS = Credentials(api_key="key", team_path="team", app_id=1, server_id=1)
 
-# Default prompt responses: domain, concurrency (used in all cases)
-DEFAULT_PROMPTS = ["myapp.example.com", "2"]
-
-
 def _run(answers: dict, extra_prompts: list[str] | None = None) -> MagicMock:
     """Run provision with a mocked client and return the mock."""
-    prompts = iter(DEFAULT_PROMPTS + (extra_prompts or []))
+    prompts = iter(extra_prompts or [])
     mock_client = MagicMock()
     with (
         patch("appliku_cli.provision.ApplikuClient", return_value=mock_client),
