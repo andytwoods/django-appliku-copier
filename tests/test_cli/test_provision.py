@@ -19,6 +19,7 @@ def _run(answers: dict, extra_prompts: list[str] | None = None) -> MagicMock:
     with (
         patch("appliku_cli.provision.ApplikuClient", return_value=mock_client),
         patch("appliku_cli.provision._prompt", side_effect=prompts),
+        patch("appliku_cli.provision.time.sleep"),
     ):
         run_provision(CREDS, answers)
     return mock_client
