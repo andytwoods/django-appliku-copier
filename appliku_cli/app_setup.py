@@ -4,7 +4,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from appliku_cli.api import ApplikuClient
+from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.credentials import Credentials, save_app_id, save_deployment_target, save_team_path
 
 logger = logging.getLogger(__name__)
@@ -179,41 +179,38 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
 
     cluster_id, server_id = _pick_deployment_target(client)
 
-    common_kwargs = dict(
-        name=app_name,
-        branch=branch,
-        cluster_id=cluster_id,
-        server_id=server_id,
-        dockerfile_context_path=dockerfile_context_path,
-        yml_config_file_path=yml_config_file_path,
-    )
-
     if provider == "github":
         logger.info("Resolving GitHub repository: %s", repo_path)
         resolved = _resolve_github_repo(client, repo_path)
-        result = client.create_app(
-            **common_kwargs,
-            repository_provider="github",
-            repository_name=resolved,
-        )
-
+        provider_kwargs = {"repository_provider": "github", "repository_name": resolved}
     elif provider == "gitlab":
         logger.info("Resolving GitLab repository: %s", repo_path)
         gitlab_id = _resolve_gitlab_repo_id(client, repo_path)
-        result = client.create_app(
-            **common_kwargs,
-            repository_provider="gitlab",
-            gitlab_repository_id=gitlab_id,
-        )
-
+        provider_kwargs = {"repository_provider": "gitlab", "gitlab_repository_id": gitlab_id}
     else:
         logger.warning("Remote is not GitHub or GitLab — using custom provider")
         custom_url = input("Git clone URL (for Appliku custom provider): ").strip()
-        result = client.create_app(
-            **common_kwargs,
-            repository_provider="custom",
-            custom_git_url=custom_url,
-        )
+        provider_kwargs = {"repository_provider": "custom", "custom_git_url": custom_url}
+
+    while True:
+        try:
+            result = client.create_app(
+                name=app_name,
+                branch=branch,
+                cluster_id=cluster_id,
+                server_id=server_id,
+                dockerfile_context_path=dockerfile_context_path,
+                yml_config_file_path=yml_config_file_path,
+                **provider_kwargs,
+            )
+            break
+        except ApplikuAPIError as exc:
+            if exc.status_code == 400 and "must be unique" in exc.body:
+                print(f"\nApp name '{app_name}' is already taken in your Appliku team.")
+                raw = input("Enter a different app name (letters and numbers only): ").strip()
+                app_name = _sanitize_app_name(raw)
+            else:
+                raise
 
     app_id = int(result["id"])
     logger.info("App created: id=%s name=%s", app_id, app_name)
