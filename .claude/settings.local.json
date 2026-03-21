@@ -9,7 +9,8 @@
       "Bash(curl -s https://api.appliku.com/api/schema/)",
       "Bash(python:*)",
       "WebFetch(domain:appliku.com)",
-      "Bash(uv pip:*)"
+      "Bash(uv pip:*)",
+      "Bash(/Users/andytwoods/PycharmProjects/DjangoAppliku/README.md:*)"
     ]
   }
 }

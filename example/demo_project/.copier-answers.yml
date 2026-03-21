@@ -5,7 +5,7 @@ email_backend: console
 media_storage: none
 package_manager: pip
 project_name: Demo Project
-project_slug: config
+project_slug: testapp1
 python_version: '3.13'
 task_runner: none
 use_sentry: 'false'
