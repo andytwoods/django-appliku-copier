@@ -44,7 +44,7 @@ def test_bool_coercion(value, expected):
 
 def test_baseline_provisions_db_only():
     client = _run({"db_type": "postgresql_17", "task_runner": "none"})
-    client.create_datastore.assert_called_once_with(name="db", store_type="postgresql_17")
+    client.create_datastore.assert_called_once_with(name="db", store_type="postgresql_17", server_id=None, cluster_id=None)
     client.create_volume.assert_not_called()
 
 
@@ -122,7 +122,7 @@ def test_huey_provisions_redis():
 
 def test_postgis_db_type_passed_correctly():
     client = _run({"db_type": "postgis_16_34", "task_runner": "none"})
-    client.create_datastore.assert_called_once_with(name="db", store_type="postgis_16_34")
+    client.create_datastore.assert_called_once_with(name="db", store_type="postgis_16_34", server_id=None, cluster_id=None)
 
 
 # ── Media storage: volume ─────────────────────────────────────────────────────

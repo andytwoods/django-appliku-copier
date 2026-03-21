@@ -124,17 +124,24 @@ class ApplikuClient:
 
     # ── App-level (app_id required) ───────────────────────────────────────────
 
-    def create_datastore(self, name: str, store_type: str) -> dict:
+    def create_datastore(
+        self,
+        name: str,
+        store_type: str,
+        server_id: int | None = None,
+        cluster_id: int | None = None,
+    ) -> dict:
         """POST /api/team/{team_path}/applications/{app_id}/datastores"""
         team_path = self._require_team_path()
         app_id = self._require_app_id()
         logger.info("Creating datastore name=%r store_type=%r", name, store_type)
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/datastores"
-        return self._check(self._session.post(url, json={
-            "name": name,
-            "store_type": store_type,
-            "is_default": True,
-        }))
+        payload: dict = {"name": name, "store_type": store_type, "is_default": True}
+        if server_id is not None:
+            payload["server"] = server_id
+        if cluster_id is not None:
+            payload["cluster"] = cluster_id
+        return self._check(self._session.post(url, json=payload))
 
     def set_config_vars(self, vars: dict[str, str]) -> None:
         """PATCH /api/team/{team_path}/applications/{app_id}/config-vars"""

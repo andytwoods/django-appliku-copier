@@ -194,7 +194,7 @@ def test_create_new_app_github(tmp_path):
     answers = {"project_slug": "myapp"}
 
     with _mock_git_detection("github", "acme/myapp"):
-        app_id = create_new_app(client, answers, tmp_path)
+        app_id, cluster_id, server_id = create_new_app(client, answers, tmp_path)
 
     assert app_id == 55
     client.create_app.assert_called_once()
@@ -211,7 +211,7 @@ def test_create_new_app_gitlab(tmp_path):
     answers = {"project_slug": "myapp"}
 
     with _mock_git_detection("gitlab", "acme/myapp"):
-        app_id = create_new_app(client, answers, tmp_path)
+        app_id, cluster_id, server_id = create_new_app(client, answers, tmp_path)
 
     assert app_id == 56
     call_kwargs = client.create_app.call_args.kwargs
@@ -226,7 +226,7 @@ def test_create_new_app_custom_remote(tmp_path):
 
     with _mock_git_detection("custom", None):
         with patch("builtins.input", return_value="https://mygit.com/repo.git"):
-            app_id = create_new_app(client, answers, tmp_path)
+            app_id, cluster_id, server_id = create_new_app(client, answers, tmp_path)
 
     assert app_id == 57
     call_kwargs = client.create_app.call_args.kwargs
@@ -273,7 +273,7 @@ def test_ensure_app_id_creates_new_app_on_blank_input(tmp_path):
     creds = Credentials(api_key="k", team_path="t", app_id=None)
     client = MagicMock()
 
-    with patch("appliku_cli.app_setup.create_new_app", return_value=99) as mock_create:
+    with patch("appliku_cli.app_setup.create_new_app", return_value=(99, None, None)) as mock_create:
         with patch("builtins.input", return_value=""):
             app_id = ensure_app_id(creds, client, {"project_slug": "myapp"}, cwd=tmp_path)
 

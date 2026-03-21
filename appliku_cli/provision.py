@@ -16,11 +16,22 @@ def _bool(value: object) -> bool:
     return str(value).strip().lower() in ("true", "1", "yes")
 
 
-def _create_datastore(client: ApplikuClient, name: str, store_type: str) -> None:
+def _create_datastore(
+    client: ApplikuClient,
+    name: str,
+    store_type: str,
+    server_id: int | None = None,
+    cluster_id: int | None = None,
+) -> None:
     """Create a datastore, retrying once on 500 (Appliku sometimes needs a moment)."""
     for attempt in range(2):
         try:
-            client.create_datastore(name=name, store_type=store_type)
+            client.create_datastore(
+                name=name,
+                store_type=store_type,
+                server_id=server_id,
+                cluster_id=cluster_id,
+            )
             return
         except ApplikuAPIError as e:
             if e.status_code == 500 and attempt == 0:
@@ -52,6 +63,8 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     media_storage: str = answers.get("media_storage", "none")
     email_backend: str = answers.get("email_backend", "console")
     use_sentry: bool = _bool(answers.get("use_sentry", False))
+    server_id: int | None = credentials.server_id
+    cluster_id: int | None = credentials.cluster_id
 
     needs_redis = task_runner != "none" and (
         task_runner == "huey" or celery_broker == "redis"
@@ -62,20 +75,20 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
 
     # Step 1: Provision database
     logger.info("Step 1/11: Provisioning database (%s)", db_type)
-    _create_datastore(client, name="db", store_type=db_type)
+    _create_datastore(client, name="db", store_type=db_type, server_id=server_id, cluster_id=cluster_id)
 
     # Step 2: Provision Redis
     if needs_redis:
         redis_store_type = f"redis_{redis_version}"
         logger.info("Step 2/11: Provisioning Redis (%s)", redis_store_type)
-        _create_datastore(client, name="cache", store_type=redis_store_type)
+        _create_datastore(client, name="cache", store_type=redis_store_type, server_id=server_id, cluster_id=cluster_id)
     else:
         logger.info("Step 2/11: Redis not required — skipping")
 
     # Step 3: Provision RabbitMQ
     if task_runner == "celery" and celery_broker == "rabbitmq":
         logger.info("Step 3/11: Provisioning RabbitMQ")
-        _create_datastore(client, name="broker", store_type="rabbitmq")
+        _create_datastore(client, name="broker", store_type="rabbitmq", server_id=server_id, cluster_id=cluster_id)
     else:
         logger.info("Step 3/11: RabbitMQ not required — skipping")
 

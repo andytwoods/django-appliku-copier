@@ -15,6 +15,8 @@ class Credentials:
     api_key: str
     team_path: str | None  # None until ensure_team_path() resolves it
     app_id: int | None  # None until ensure_app_id() resolves it
+    server_id: int | None = None   # set when app is deployed to a server
+    cluster_id: int | None = None  # set when app is deployed to a cluster
 
 
 def load_credentials(cwd: Path | None = None) -> Credentials:
@@ -43,11 +45,32 @@ def load_credentials(cwd: Path | None = None) -> Credentials:
 
     raw_team = values.get("APPLIKU_TEAM_PATH", "").strip()
     raw_app_id = values.get("APPLIKU_APP_ID", "").strip()
+    raw_server_id = values.get("APPLIKU_SERVER_ID", "").strip()
+    raw_cluster_id = values.get("APPLIKU_CLUSTER_ID", "").strip()
     return Credentials(
         api_key=values["APPLIKU_API_KEY"],
         team_path=raw_team or None,
         app_id=int(raw_app_id) if raw_app_id else None,
+        server_id=int(raw_server_id) if raw_server_id else None,
+        cluster_id=int(raw_cluster_id) if raw_cluster_id else None,
     )
+
+
+def save_deployment_target(
+    server_id: int | None,
+    cluster_id: int | None,
+    cwd: Path | None = None,
+) -> None:
+    """Persist APPLIKU_SERVER_ID or APPLIKU_CLUSTER_ID to .env.appliku."""
+    base = cwd or Path.cwd()
+    env_file = base / ENV_FILENAME
+    values = _parse_env_file(env_file) if env_file.exists() else {}
+    if server_id is not None:
+        values["APPLIKU_SERVER_ID"] = str(server_id)
+    if cluster_id is not None:
+        values["APPLIKU_CLUSTER_ID"] = str(cluster_id)
+    _write_env_file(env_file, values)
+    logger.info("Deployment target saved to %s", env_file)
 
 
 def save_team_path(team_path: str, cwd: Path | None = None) -> None:
@@ -101,11 +124,17 @@ def _prompt_and_write(env_file: Path) -> dict[str, str]:
     return values
 
 
+_TRAILING_KEYS = ("APPLIKU_APP_ID", "APPLIKU_SERVER_ID", "APPLIKU_CLUSTER_ID")
+
+
 def _write_env_file(env_file: Path, values: dict[str, str]) -> None:
-    lines = "\n".join(f"{k}={v}" for k, v in values.items() if k != "APPLIKU_APP_ID") + "\n"
-    app_id = values.get("APPLIKU_APP_ID", "").strip()
-    if app_id:
-        lines += f"APPLIKU_APP_ID={app_id}\n"
+    lines = "\n".join(
+        f"{k}={v}" for k, v in values.items() if k not in _TRAILING_KEYS
+    ) + "\n"
+    for key in _TRAILING_KEYS:
+        val = values.get(key, "").strip()
+        if val:
+            lines += f"{key}={val}\n"
     env_file.write_text(lines)
     logger.info("Credentials written to %s", env_file)
 

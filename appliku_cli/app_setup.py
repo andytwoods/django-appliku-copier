@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from appliku_cli.api import ApplikuClient
-from appliku_cli.credentials import Credentials, save_app_id, save_team_path
+from appliku_cli.credentials import Credentials, save_app_id, save_deployment_target, save_team_path
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +188,7 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
 
     app_id = int(result["id"])
     logger.info("App created: id=%s name=%s", app_id, app_name)
-    return app_id
+    return app_id, cluster_id, server_id
 
 
 def ensure_team_path(
@@ -262,7 +262,10 @@ def ensure_app_id(
         logger.info("Using existing app_id=%s", app_id)
     else:
         print("Creating a new Appliku app…")
-        app_id = create_new_app(client, answers, cwd)
+        app_id, cluster_id, server_id = create_new_app(client, answers, cwd)
+        save_deployment_target(server_id=server_id, cluster_id=cluster_id, cwd=cwd)
+        credentials.server_id = server_id
+        credentials.cluster_id = cluster_id
 
     save_app_id(app_id, cwd)
     credentials.app_id = app_id
