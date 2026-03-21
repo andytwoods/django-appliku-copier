@@ -97,6 +97,8 @@ class ApplikuClient:
         repository_name: str | None = None,
         gitlab_repository_id: int | None = None,
         custom_git_url: str | None = None,
+        dockerfile_context_path: str | None = None,
+        yml_config_file_path: str = "appliku.yml",
     ) -> dict:
         """POST /api/team/{team_path}/applications/create/"""
         team_path = self._require_team_path()
@@ -107,7 +109,7 @@ class ApplikuClient:
             "branch": branch,
             "build_pack": "dockerfile",
             "dockerfile_path": "Dockerfile",
-            "yml_config_file_path": "appliku.yml",
+            "yml_config_file_path": yml_config_file_path,
             "repository_provider": repository_provider,
         }
         if cluster_id is not None:
@@ -120,6 +122,8 @@ class ApplikuClient:
             payload["gitlab_repository_id"] = gitlab_repository_id
         if custom_git_url is not None:
             payload["custom_git_url"] = custom_git_url
+        if dockerfile_context_path is not None:
+            payload["dockerfile_context_path"] = dockerfile_context_path
         return self._check(self._session.post(url, json=payload))
 
     # ── App-level (app_id required) ───────────────────────────────────────────
