@@ -4,7 +4,7 @@ import pytest
 from tests.conftest import MATRIX
 
 ALWAYS_PRESENT = ["appliku.yml", "Dockerfile", "run.sh", "release.sh"]
-WORKER_SCRIPT = "celery-worker.sh"
+WORKER_SCRIPT = "worker.sh"
 BEAT_SCRIPT = "celery-beat.sh"
 
 
@@ -19,9 +19,9 @@ def test_required_files_present(render, overrides, expect_worker, expect_beat):
 def test_worker_script_presence(render, overrides, expect_worker, expect_beat):
     dest = render(overrides)
     if expect_worker:
-        assert (dest / WORKER_SCRIPT).exists(), "celery-worker.sh should exist"
+        assert (dest / WORKER_SCRIPT).exists(), "worker.sh should exist"
     else:
-        assert not (dest / WORKER_SCRIPT).exists(), "celery-worker.sh should not exist"
+        assert not (dest / WORKER_SCRIPT).exists(), "worker.sh should not exist"
 
 
 @pytest.mark.parametrize("overrides,expect_worker,expect_beat", MATRIX)

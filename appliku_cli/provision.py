@@ -140,8 +140,13 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     def push_vars(vars: dict) -> None:
         _retry_on_500("Config vars", client.set_config_vars, vars)
 
-    print("[5/7] Pushing SECRET_KEY…")
-    push_vars({"SECRET_KEY": secrets.token_urlsafe(50)})
+    print("[5/7] Pushing config vars…")
+    config_vars: dict[str, str] = {"SECRET_KEY": secrets.token_urlsafe(50)}
+    domains = client.list_domains()
+    if domains:
+        config_vars["ALLOWED_HOSTS"] = ",".join(domains)
+        config_vars["CSRF_TRUSTED_ORIGINS"] = ",".join(f"https://{d}" for d in domains)
+    push_vars(config_vars)
     print("      ✓ Done")
 
     if media_storage == "s3_compatible":
@@ -170,21 +175,10 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     print("[7/7] Triggering first deployment…")
     client.trigger_deploy()
 
-    domains = client.list_domains()
     print("\nAppliku setup complete.")
     if domains:
         urls = [f"https://{d}" for d in domains]
         print(f"Your app will be available at: {', '.join(urls)}")
-        print(
-            "\nIMPORTANT: ensure your Django settings read ALLOWED_HOSTS from the\n"
-            "environment, e.g.:\n"
-            "\n"
-            "    ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])\n"
-            "\n"
-            "The appliku.yml injects the domain automatically via 'from_domains: true',\n"
-            f"so {', '.join(domains)} will be added for you — but only if settings.py\n"
-            "reads ALLOWED_HOSTS from the environment."
-        )
     print(
         "\nThe first build is now running. Monitor progress at:\n"
         "  https://app.appliku.com\n"

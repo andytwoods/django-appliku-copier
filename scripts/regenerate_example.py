@@ -17,17 +17,16 @@ GENERATED_FILES = [
     "Dockerfile",
     "run.sh",
     "release.sh",
-    "celery-worker.sh",
+    "worker.sh",
     "celery-beat.sh",
 ]
 
 COPIER_DATA = {
-    "project_name": "Demo Project",
-    "project_slug": "config",
+    "project_slug": "testapp1",
     "python_version": "3.13",
-    "package_manager": "pip",
+    "package_manager": "uv",
     "web_server": "gunicorn",
-    "db_type": "postgresql_17",
+    "db_type": "postgresql_18",
     "task_runner": "none",
     "media_storage": "none",
     "email_backend": "console",

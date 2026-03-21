@@ -8,11 +8,12 @@ from appliku_cli.provision import _bool, run_provision
 
 CREDS = Credentials(api_key="key", team_path="team", app_id=1, server_id=1)
 
-def _run(answers: dict, extra_prompts: list[str] | None = None) -> MagicMock:
+def _run(answers: dict, extra_prompts: list[str] | None = None, domains: list[str] | None = None) -> MagicMock:
     """Run provision with a mocked client and return the mock."""
     prompts = iter(extra_prompts or [])
     mock_client = MagicMock()
     mock_client.list_datastores.return_value = []
+    mock_client.list_domains.return_value = domains or []
     with (
         patch("appliku_cli.provision.ApplikuClient", return_value=mock_client),
         patch("appliku_cli.provision._prompt", side_effect=prompts),
@@ -20,6 +21,14 @@ def _run(answers: dict, extra_prompts: list[str] | None = None) -> MagicMock:
     ):
         run_provision(CREDS, answers)
     return mock_client
+
+
+def _all_pushed_vars(client: MagicMock) -> dict:
+    """Merge all set_config_vars calls into one dict."""
+    merged: dict = {}
+    for c in client.set_config_vars.call_args_list:
+        merged.update(c.args[0])
+    return merged
 
 
 # ── _bool helper ──────────────────────────────────────────────────────────────
@@ -47,14 +56,22 @@ def test_baseline_provisions_db_only():
 
 def test_baseline_sets_secret_key():
     client = _run({"db_type": "postgresql_17", "task_runner": "none"})
-    calls = client.set_config_vars.call_args_list
-    secret_key_call = next(
-        (c for c in calls if "SECRET_KEY" in c.args[0] or "SECRET_KEY" in c.kwargs.get("vars", {})),
-        None,
+    assert "SECRET_KEY" in _all_pushed_vars(client)
+
+
+def test_domains_push_allowed_hosts():
+    client = _run(
+        {"db_type": "postgresql_17", "task_runner": "none"},
+        domains=["myapp.appliku.app"],
     )
-    # Find the call that contains SECRET_KEY
-    found = any("SECRET_KEY" in str(c) for c in calls)
-    assert found, "SECRET_KEY was never pushed"
+    vars = _all_pushed_vars(client)
+    assert vars["ALLOWED_HOSTS"] == "myapp.appliku.app"
+    assert vars["CSRF_TRUSTED_ORIGINS"] == "https://myapp.appliku.app"
+
+
+def test_no_domains_skips_allowed_hosts():
+    client = _run({"db_type": "postgresql_17", "task_runner": "none"})
+    assert "ALLOWED_HOSTS" not in _all_pushed_vars(client)
 
 
 def test_baseline_triggers_deploy():
@@ -145,9 +162,7 @@ def test_s3_storage_pushes_aws_vars():
         extra_prompts=["key-id", "secret", "bucket", "https://s3.example.com"],
     )
     client.create_volume.assert_not_called()
-    all_vars: dict = {}
-    for c in client.set_config_vars.call_args_list:
-        all_vars.update(c.args[0])
+    all_vars = _all_pushed_vars(client)
     assert "AWS_ACCESS_KEY_ID" in all_vars
     assert "AWS_STORAGE_BUCKET_NAME" in all_vars
 
@@ -159,18 +174,12 @@ def test_sentry_pushes_dsn():
         {"db_type": "postgresql_17", "task_runner": "none", "use_sentry": True},
         extra_prompts=["https://sentry.io/dsn"],
     )
-    all_vars: dict = {}
-    for c in client.set_config_vars.call_args_list:
-        all_vars.update(c.args[0])
-    assert "SENTRY_DSN" in all_vars
+    assert "SENTRY_DSN" in _all_pushed_vars(client)
 
 
 def test_sentry_false_does_not_push_dsn():
     client = _run({"db_type": "postgresql_17", "task_runner": "none", "use_sentry": False})
-    all_vars: dict = {}
-    for c in client.set_config_vars.call_args_list:
-        all_vars.update(c.args[0])
-    assert "SENTRY_DSN" not in all_vars
+    assert "SENTRY_DSN" not in _all_pushed_vars(client)
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
@@ -180,16 +189,11 @@ def test_email_smtp_pushes_email_vars():
         {"db_type": "postgresql_17", "task_runner": "none", "email_backend": "smtp"},
         extra_prompts=["smtp.example.com", "587", "user@example.com", "pass"],
     )
-    all_vars: dict = {}
-    for c in client.set_config_vars.call_args_list:
-        all_vars.update(c.args[0])
+    all_vars = _all_pushed_vars(client)
     assert "EMAIL_HOST" in all_vars
     assert "EMAIL_HOST_PASSWORD" in all_vars
 
 
 def test_email_console_does_not_push_email_vars():
     client = _run({"db_type": "postgresql_17", "task_runner": "none", "email_backend": "console"})
-    all_vars: dict = {}
-    for c in client.set_config_vars.call_args_list:
-        all_vars.update(c.args[0])
-    assert "EMAIL_HOST" not in all_vars
+    assert "EMAIL_HOST" not in _all_pushed_vars(client)

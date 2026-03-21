@@ -11,7 +11,7 @@ The system generates:
 - `run.sh`
 - `release.sh`
 - optional service scripts:
-  - `celery-worker.sh`
+  - `worker.sh`
   - `celery-beat.sh`
 
 This scaffold is specifically for **Django deployments on Appliku**. It does not create a new Django project — it adds deployment infrastructure to one that already exists.
@@ -104,7 +104,7 @@ template/
   Dockerfile.jinja
   run.sh.jinja
   release.sh.jinja
-  celery-worker.sh.jinja   (conditional)
+  worker.sh.jinja   (conditional)
   celery-beat.sh.jinja     (conditional)
 
 example/
@@ -175,7 +175,7 @@ A `Dockerfile` is always generated.
 Templates MUST conditionally render:
 
 - `appliku.yml` sections (datastores, worker/beat processes)
-- scripts (`celery-worker.sh`, `celery-beat.sh`)
+- scripts (`worker.sh`, `celery-beat.sh`)
 
 based strictly on these variables.
 
@@ -192,7 +192,7 @@ Always generated:
 
 Generated only when flag is set:
 
-- `celery-worker.sh` (if `task_runner != "none"`)
+- `worker.sh` (if `task_runner != "none"`)
 - `celery-beat.sh` (if `use_beat`)
 
 ---

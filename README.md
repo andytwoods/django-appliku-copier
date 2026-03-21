@@ -12,7 +12,7 @@ There are two separate steps:
 **Step 1 — `copier copy`** asks you about your project's infrastructure needs
 (database variant, task runner, media storage, etc.) and generates deployment
 files tailored to your answers: `Dockerfile`, `appliku.yml`, `run.sh`,
-`release.sh`, and optionally a worker script (`celery-worker.sh` for Celery/Huey,
+`release.sh`, and optionally a worker script (`worker.sh` for Celery/Huey,
 `celery-beat.sh` for Celery beat).
 You commit these files to git.
 
@@ -281,6 +281,15 @@ copier copy ../../template . --overwrite --trust
 This prompts for every question fresh and overwrites the generated files —
 no need to delete `.copier-answers.yml` first. Useful for checking how the
 generated output looks for different combinations of answers.
+
+> **Note:** `.copier-answers.yml` will **not** be updated by this command.
+> Copier only writes that file when the template has a git version tag; a local
+> path has none. This is fine for template testing — you care about the
+> generated files (Dockerfile, appliku.yml, worker.sh …), not the answers
+> record. To reset the example project back to its committed baseline, run:
+> ```bash
+> python scripts/regenerate_example.py
+> ```
 
 ### Testing `appliku-setup` against a real Appliku account
 
