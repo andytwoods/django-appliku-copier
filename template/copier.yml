@@ -13,8 +13,16 @@ project_slug:
 
 python_version:
     type: str
-    help: "Python version for the Dockerfile base image (e.g. 3.12)"
-    default: "3.12"
+    help: "Python version for the Dockerfile base image (e.g. 3.13)"
+    default: "3.13"
+
+package_manager:
+    type: str
+    help: "How dependencies are installed in the Docker image"
+    choices:
+        - uv
+        - pip
+    default: uv
 
 web_server:
     type: str

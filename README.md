@@ -52,7 +52,8 @@ Copier asks a series of questions:
 |---|---|---|
 | Project name | any string | — |
 | Project slug | Python module name (e.g. `my_app`) | derived from name |
-| Python version | e.g. `3.12` | `3.12` |
+| Python version | e.g. `3.13` | `3.13` |
+| Package manager | `uv`, `pip` | `uv` |
 | Web server | `gunicorn`, `uvicorn` | `gunicorn` |
 | Database | `postgresql_17/16/15/18`, `postgis_16_34`, `postgresql_16_pgvector`, `timescale_db_17`, `mysql_8` | `postgresql_17` |
 | Task runner | `none`, `celery`, `huey` | `none` |
@@ -111,7 +112,7 @@ anything already configured.
 The template does not touch your Django source files. You need these in place
 before deploying.
 
-**Packages** (`requirements.txt`):
+**Packages** — add to `pyproject.toml` (uv) or `requirements.txt` (pip):
 
 ```
 psycopg2-binary

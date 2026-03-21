@@ -51,6 +51,22 @@ def test_beat_shebang(render, overrides, expect_worker, expect_beat):
     assert first_line == "#!/usr/bin/env bash", "Shebang must be on line 1"
 
 
+def test_dockerfile_uv(render):
+    dest = render({"package_manager": "uv"})
+    content = (dest / "Dockerfile").read_text()
+    assert "uv sync --frozen --no-dev" in content
+    assert "pyproject.toml" in content
+    assert "requirements.txt" not in content
+
+
+def test_dockerfile_pip(render):
+    dest = render({"package_manager": "pip"})
+    content = (dest / "Dockerfile").read_text()
+    assert "pip install" in content
+    assert "requirements.txt" in content
+    assert "uv sync" not in content
+
+
 def test_run_sh_gunicorn(render):
     dest = render({"web_server": "gunicorn"})
     content = (dest / "run.sh").read_text()

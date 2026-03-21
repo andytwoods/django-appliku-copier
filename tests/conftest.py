@@ -10,7 +10,8 @@ TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "template"
 BASE_DATA: dict[str, Any] = {
     "project_name": "Test Project",
     "project_slug": "test_project",
-    "python_version": "3.12",
+    "python_version": "3.13",
+    "package_manager": "uv",
     "web_server": "gunicorn",
     "db_type": "postgresql_17",
     "task_runner": "none",
