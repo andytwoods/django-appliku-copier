@@ -27,6 +27,6 @@ services:
 
 databases:
   db:
-    type: postgresql_17
+    type: postgresql_18
   broker:
     type: rabbitmq

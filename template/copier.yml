@@ -2,14 +2,9 @@ _min_copier_version: "9.0"
 
 # ── Project identity ──────────────────────────────────────────────────────────
 
-project_name:
-    type: str
-    help: "Human-readable project name (e.g. My App)"
-
 project_slug:
     type: str
-    help: "Python module name used in wsgi/asgi paths (e.g. my_app)"
-    default: "{{ project_name | lower | replace(' ', '_') | replace('-', '_') }}"
+    help: "Python module name used in wsgi/asgi paths (e.g. myapp)"
 
 python_version:
     type: str
@@ -46,7 +41,7 @@ db_type:
         - postgresql_16_pgvector
         - timescale_db_17
         - mysql_8
-    default: postgresql_17
+    default: postgresql_18
 
 # ── Task runner ───────────────────────────────────────────────────────────────
 

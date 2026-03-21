@@ -8,12 +8,11 @@ import pytest
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "template"
 
 BASE_DATA: dict[str, Any] = {
-    "project_name": "Test Project",
     "project_slug": "test_project",
     "python_version": "3.13",
     "package_manager": "uv",
     "web_server": "gunicorn",
-    "db_type": "postgresql_17",
+    "db_type": "postgresql_18",
     "task_runner": "none",
     "media_storage": "none",
     "email_backend": "console",
@@ -47,27 +46,27 @@ def render_template(tmp_path: Path, overrides: dict[str, Any] | None = None) -> 
 
 MATRIX = [
     pytest.param(
-        {"db_type": "postgresql_17", "task_runner": "none"},
+        {"db_type": "postgresql_18", "task_runner": "none"},
         False, False,
         id="baseline",
     ),
     pytest.param(
-        {"db_type": "postgresql_17", "task_runner": "celery", "celery_broker": "redis", "redis_version": "8"},
+        {"db_type": "postgresql_18", "task_runner": "celery", "celery_broker": "redis", "redis_version": "8"},
         True, False,
         id="celery-redis",
     ),
     pytest.param(
-        {"db_type": "postgresql_17", "task_runner": "celery", "celery_broker": "redis", "redis_version": "8", "use_beat": "true"},
+        {"db_type": "postgresql_18", "task_runner": "celery", "celery_broker": "redis", "redis_version": "8", "use_beat": "true"},
         True, True,
         id="celery-redis-beat",
     ),
     pytest.param(
-        {"db_type": "postgresql_17", "task_runner": "celery", "celery_broker": "rabbitmq", "redis_version": "8"},
+        {"db_type": "postgresql_18", "task_runner": "celery", "celery_broker": "rabbitmq", "redis_version": "8"},
         True, False,
         id="celery-rabbitmq",
     ),
     pytest.param(
-        {"db_type": "postgresql_17", "task_runner": "celery", "celery_broker": "rabbitmq", "redis_version": "8", "use_beat": "true"},
+        {"db_type": "postgresql_18", "task_runner": "celery", "celery_broker": "rabbitmq", "redis_version": "8", "use_beat": "true"},
         True, True,
         id="celery-rabbitmq-beat",
     ),
@@ -77,18 +76,18 @@ MATRIX = [
         id="postgis",
     ),
     pytest.param(
-        {"db_type": "postgresql_17", "task_runner": "huey", "redis_version": "8"},
+        {"db_type": "postgresql_18", "task_runner": "huey", "redis_version": "8"},
         True, False,
         id="huey",
     ),
     pytest.param(
-        {"db_type": "postgresql_17", "task_runner": "none", "media_storage": "s3_compatible"},
+        {"db_type": "postgresql_18", "task_runner": "none", "media_storage": "s3_compatible"},
         False, False,
         id="s3-storage",
     ),
     pytest.param(
         {
-            "db_type": "postgresql_17",
+            "db_type": "postgresql_18",
             "task_runner": "celery",
             "celery_broker": "redis",
             "redis_version": "8",

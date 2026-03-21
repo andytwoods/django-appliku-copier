@@ -29,6 +29,6 @@ services:
 
 databases:
   db:
-    type: postgresql_17
+    type: postgresql_18
   cache:
     type: redis_8
