@@ -12,7 +12,8 @@ There are two separate steps:
 **Step 1 — `copier copy`** asks you about your project's infrastructure needs
 (database variant, task runner, media storage, etc.) and generates deployment
 files tailored to your answers: `Dockerfile`, `appliku.yml`, `run.sh`,
-`release.sh`, and optionally `celery-worker.sh` / `celery-beat.sh`.
+`release.sh`, and optionally a worker script (`celery-worker.sh` for Celery/Huey,
+`celery-beat.sh` for Celery beat).
 You commit these files to git.
 
 **Step 2 — `appliku-setup`** connects to Appliku and does the one-time setup:
@@ -59,7 +60,7 @@ Copier asks a series of questions:
 | Task runner | `none`, `celery`, `huey` | `none` |
 | Celery broker | `redis`, `rabbitmq` | `redis` *(if Celery)* |
 | Redis version | `8`, `7`, `6` | `8` *(if Redis needed)* |
-| Celery beat? | yes/no | `no` *(if Celery)* |
+| Celery beat? | yes/no | `no` *(if Celery — Huey has a built-in scheduler)* |
 | Media storage | `none`, `s3_compatible`, `volume` | `none` |
 | Email backend | `console`, `smtp`, `sendgrid`, `mailgun`, `ses` | `console` |
 | Sentry? | yes/no | `no` |
