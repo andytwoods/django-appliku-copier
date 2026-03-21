@@ -106,6 +106,7 @@ class ApplikuClient:
             "name": name,
             "branch": branch,
             "build_pack": "dockerfile",
+            "dockerfile_path": "Dockerfile",
             "yml_config_file_path": "appliku.yml",
             "repository_provider": repository_provider,
         }
