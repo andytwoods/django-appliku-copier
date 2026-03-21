@@ -1,6 +1,7 @@
 """Orchestrate Appliku resource provisioning from Copier answers."""
 import logging
 import secrets
+import sys
 import time
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
@@ -16,6 +17,16 @@ def _bool(value: object) -> bool:
     return str(value).strip().lower() in ("true", "1", "yes")
 
 
+def _countdown(message: str, seconds: int) -> None:
+    """Show a live countdown so the user knows something is happening."""
+    for remaining in range(seconds, 0, -1):
+        sys.stdout.write(f"\r  {message} ({remaining}s)…")
+        sys.stdout.flush()
+        time.sleep(1)
+    sys.stdout.write(f"\r  {message} — done.          \n")
+    sys.stdout.flush()
+
+
 def _retry_on_500(label: str, fn, *args, wait: int = 5, **kwargs):
     """Call fn(*args, **kwargs), retrying once after `wait` seconds on a 500."""
     for attempt in range(2):
@@ -23,8 +34,8 @@ def _retry_on_500(label: str, fn, *args, wait: int = 5, **kwargs):
             return fn(*args, **kwargs)
         except ApplikuAPIError as e:
             if e.status_code == 500 and attempt == 0:
-                logger.warning("%s got 500 — waiting %ss and retrying", label, wait)
-                time.sleep(wait)
+                print(f"  Appliku not ready yet — retrying in {wait}s…")
+                _countdown("Waiting", wait)
             else:
                 raise
 
@@ -98,64 +109,65 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
         return
 
     # Brief pause to allow Appliku to finish setting up the newly created app
-    time.sleep(8)
+    _countdown("Waiting for Appliku to initialise the app", 8)
 
-    # Step 1: Provision database
-    logger.info("Step 1/11: Provisioning database (%s)", db_type)
+    print("[1/7] Provisioning database…")
     _create_datastore(client, name="db", store_type=db_type, server_id=server_id, cluster_id=cluster_id)
+    print(f"      ✓ {db_type} database ready")
 
-    # Step 2: Provision Redis
     if needs_redis:
         redis_store_type = f"redis_{redis_version}"
-        logger.info("Step 2/11: Provisioning Redis (%s)", redis_store_type)
+        print(f"[2/7] Provisioning Redis ({redis_store_type})…")
         _create_datastore(client, name="cache", store_type=redis_store_type, server_id=server_id, cluster_id=cluster_id)
+        print(f"      ✓ Redis ready")
     else:
-        logger.info("Step 2/11: Redis not required — skipping")
+        print("[2/7] Redis — not required, skipping")
 
-    # Step 3: Provision RabbitMQ
     if task_runner == "celery" and celery_broker == "rabbitmq":
-        logger.info("Step 3/11: Provisioning RabbitMQ")
+        print("[3/7] Provisioning RabbitMQ…")
         _create_datastore(client, name="broker", store_type="rabbitmq", server_id=server_id, cluster_id=cluster_id)
+        print("      ✓ RabbitMQ ready")
     else:
-        logger.info("Step 3/11: RabbitMQ not required — skipping")
+        print("[3/7] RabbitMQ — not required, skipping")
 
-    # Step 4: Provision media volume
     if media_storage == "volume":
-        logger.info("Step 4/11: Provisioning media volume")
+        print("[4/7] Provisioning media volume…")
         client.create_volume(name="media", target="/app/media/")
+        print("      ✓ Volume ready")
     else:
-        logger.info("Step 4/11: Media volume not required — skipping")
+        print("[4/7] Media volume — not required, skipping")
 
     def push_vars(vars: dict) -> None:
         _retry_on_500("Config vars", client.set_config_vars, vars)
 
-    # Step 5: SECRET_KEY
-    logger.info("Step 5/7: Generating and pushing SECRET_KEY")
+    print("[5/7] Pushing SECRET_KEY…")
     push_vars({"SECRET_KEY": secrets.token_urlsafe(50)})
+    print("      ✓ Done")
 
-    # Step 6: Optional integrations (S3, email, Sentry)
     if media_storage == "s3_compatible":
-        logger.info("Step 6/7: Configuring S3-compatible storage")
+        print("[6/7] Configuring S3-compatible storage…")
         push_vars({
             "AWS_ACCESS_KEY_ID": _prompt("AWS_ACCESS_KEY_ID"),
             "AWS_SECRET_ACCESS_KEY": _prompt("AWS_SECRET_ACCESS_KEY"),
             "AWS_STORAGE_BUCKET_NAME": _prompt("AWS_STORAGE_BUCKET_NAME"),
             "AWS_S3_ENDPOINT_URL": _prompt("AWS_S3_ENDPOINT_URL"),
         })
+        print("      ✓ Done")
     if email_backend != "console":
-        logger.info("Step 6/7: Configuring email backend (%s)", email_backend)
+        print(f"[6/7] Configuring email ({email_backend})…")
         push_vars({
             "EMAIL_HOST": _prompt("EMAIL_HOST"),
             "EMAIL_PORT": _prompt("EMAIL_PORT", default="587"),
             "EMAIL_HOST_USER": _prompt("EMAIL_HOST_USER"),
             "EMAIL_HOST_PASSWORD": _prompt("EMAIL_HOST_PASSWORD"),
         })
+        print("      ✓ Done")
     if use_sentry:
-        logger.info("Step 6/7: Configuring Sentry")
+        print("[6/7] Configuring Sentry…")
         push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
+        print("      ✓ Done")
 
-    # Step 7: Trigger first deployment
-    logger.info("Step 7/7: Triggering first deployment")
+    print("[7/7] Triggering first deployment…")
     client.trigger_deploy()
 
     domains = client.list_domains()
@@ -176,6 +188,6 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
     print(
         "\nThe first build is now running. Monitor progress at:\n"
         "  https://app.appliku.com\n"
-        "\nOnce the build succeeds you can add a custom domain and SSL certificate\n"
+        "\nOnce the build succeeds you can add a custom domain\n"
         "from the Appliku dashboard."
     )
