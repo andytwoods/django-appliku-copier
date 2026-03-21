@@ -22,6 +22,26 @@ def client_no_app():
     return ApplikuClient(api_key=API_KEY, team_path=TEAM)
 
 
+@pytest.fixture()
+def client_no_team():
+    return ApplikuClient(api_key=API_KEY)
+
+
+# ── Account-level endpoints ───────────────────────────────────────────────────
+
+@responses_lib.activate
+def test_list_teams(client_no_team):
+    url = f"{BASE}/api/team"
+    responses_lib.add(responses_lib.GET, url, json=[{"id": 1, "name": "My Team", "team_path": "my-team"}], status=200)
+    result = client_no_team.list_teams()
+    assert result[0]["team_path"] == "my-team"
+
+
+def test_team_level_requires_team_path(client_no_team):
+    with pytest.raises(RuntimeError, match="team_path is required"):
+        client_no_team.list_clusters()
+
+
 # ── Team-level endpoints ──────────────────────────────────────────────────────
 
 @responses_lib.activate

@@ -16,7 +16,7 @@ class ApplikuAPIError(Exception):
 
 
 class ApplikuClient:
-    def __init__(self, api_key: str, team_path: str, app_id: int | None = None) -> None:
+    def __init__(self, api_key: str, team_path: str | None = None, app_id: int | None = None) -> None:
         self._team_path = team_path
         self._app_id = app_id
         self._session = requests.Session()
@@ -38,12 +38,26 @@ class ApplikuClient:
             raise RuntimeError("app_id is required for this operation; call ensure_app_id() first")
         return self._app_id
 
+    def _require_team_path(self) -> str:
+        if not self._team_path:
+            raise RuntimeError("team_path is required for this operation; call ensure_team_path() first")
+        return self._team_path
+
+    # ── Account-level (no team_path needed) ───────────────────────────────────
+
+    def list_teams(self) -> list[dict]:
+        """GET /api/team — returns list of {id, name, team_path, ...}."""
+        logger.info("Listing teams")
+        url = f"{BASE_URL}/api/team"
+        return self._check(self._session.get(url))
+
     # ── Team-level (no app_id needed) ─────────────────────────────────────────
 
     def list_clusters(self) -> list[dict]:
         """GET /api/team/{team_path}/clusters"""
-        logger.info("Listing clusters for team %r", self._team_path)
-        url = f"{BASE_URL}/api/team/{self._team_path}/clusters"
+        team_path = self._require_team_path()
+        logger.info("Listing clusters for team %r", team_path)
+        url = f"{BASE_URL}/api/team/{team_path}/clusters"
         return self._check(self._session.get(url))
 
     def list_github_repos(self) -> list[str]:
@@ -71,8 +85,9 @@ class ApplikuClient:
         custom_git_url: str | None = None,
     ) -> dict:
         """POST /api/team/{team_path}/applications/create/"""
+        team_path = self._require_team_path()
         logger.info("Creating app name=%r branch=%r cluster=%s", name, branch, cluster_id)
-        url = f"{BASE_URL}/api/team/{self._team_path}/applications/create/"
+        url = f"{BASE_URL}/api/team/{team_path}/applications/create/"
         payload: dict = {
             "name": name,
             "branch": branch,
@@ -93,9 +108,10 @@ class ApplikuClient:
 
     def create_datastore(self, name: str, store_type: str) -> dict:
         """POST /api/team/{team_path}/applications/{app_id}/datastores"""
+        team_path = self._require_team_path()
         app_id = self._require_app_id()
         logger.info("Creating datastore name=%r store_type=%r", name, store_type)
-        url = f"{BASE_URL}/api/team/{self._team_path}/applications/{app_id}/datastores"
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/datastores"
         return self._check(self._session.post(url, json={
             "name": name,
             "store_type": store_type,
@@ -104,21 +120,24 @@ class ApplikuClient:
 
     def set_config_vars(self, vars: dict[str, str]) -> None:
         """PATCH /api/team/{team_path}/applications/{app_id}/config-vars"""
+        team_path = self._require_team_path()
         app_id = self._require_app_id()
         logger.info("Setting config vars: %s", list(vars.keys()))
-        url = f"{BASE_URL}/api/team/{self._team_path}/applications/{app_id}/config-vars"
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/config-vars"
         self._check(self._session.patch(url, json=vars))
 
     def create_volume(self, name: str, target: str) -> dict:
         """POST /api/team/{team_path}/applications/{app_id}/volumes"""
+        team_path = self._require_team_path()
         app_id = self._require_app_id()
         logger.info("Creating volume name=%r target=%r", name, target)
-        url = f"{BASE_URL}/api/team/{self._team_path}/applications/{app_id}/volumes"
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/volumes"
         return self._check(self._session.post(url, json={"name": name, "target": target}))
 
     def trigger_deploy(self) -> dict:
         """POST /api/team/{team_path}/applications/{app_id}/deploy"""
+        team_path = self._require_team_path()
         app_id = self._require_app_id()
         logger.info("Triggering deployment for app_id=%s", app_id)
-        url = f"{BASE_URL}/api/team/{self._team_path}/applications/{app_id}/deploy"
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/deploy"
         return self._check(self._session.post(url))

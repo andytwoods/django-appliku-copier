@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 from appliku_cli.api import ApplikuClient
-from appliku_cli.app_setup import ensure_app_id
+from appliku_cli.app_setup import ensure_app_id, ensure_team_path
 from appliku_cli.credentials import load_credentials
 from appliku_cli.provision import run_provision
 
@@ -48,7 +48,8 @@ def main() -> None:
         app_id=credentials.app_id,
     )
 
-    # Resolve or create the Appliku app before provisioning
+    # Resolve team and app before provisioning
+    ensure_team_path(credentials, client)
     ensure_app_id(credentials, client, answers)
 
     run_provision(credentials, answers)

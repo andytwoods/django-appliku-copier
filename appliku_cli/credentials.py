@@ -12,15 +12,15 @@ GITIGNORE_FILENAME = ".gitignore"
 @dataclasses.dataclass
 class Credentials:
     api_key: str
-    team_path: str
+    team_path: str | None  # None until ensure_team_path() resolves it
     app_id: int | None  # None until ensure_app_id() resolves it
 
 
 def load_credentials(cwd: Path | None = None) -> Credentials:
     """Load credentials from .env.appliku, prompting the user if the file is missing.
 
-    APPLIKU_APP_ID is optional at this stage — call ensure_app_id() afterwards
-    when you need a resolved app ID.
+    APPLIKU_TEAM_PATH and APPLIKU_APP_ID are optional at this stage —
+    call ensure_team_path() then ensure_app_id() afterwards.
     """
     base = cwd or Path.cwd()
     env_file = base / ENV_FILENAME
@@ -32,25 +32,28 @@ def load_credentials(cwd: Path | None = None) -> Credentials:
 
     _ensure_gitignored(base)
 
-    # Prompt for any required values that are missing or blank
-    changed = False
-    for key, prompt in [
-        ("APPLIKU_API_KEY", "APPLIKU_API_KEY"),
-        ("APPLIKU_TEAM_PATH", "APPLIKU_TEAM_PATH (find it in the Appliku dashboard URL, e.g. app.appliku.com/t/<slug>/)"),
-    ]:
-        if not values.get(key, "").strip():
-            values[key] = input(f"{prompt}: ").strip()
-            changed = True
-
-    if changed:
+    # Prompt for API key if missing
+    if not values.get("APPLIKU_API_KEY", "").strip():
+        values["APPLIKU_API_KEY"] = input("APPLIKU_API_KEY: ").strip()
         _write_env_file(env_file, values)
 
+    raw_team = values.get("APPLIKU_TEAM_PATH", "").strip()
     raw_app_id = values.get("APPLIKU_APP_ID", "").strip()
     return Credentials(
         api_key=values["APPLIKU_API_KEY"],
-        team_path=values["APPLIKU_TEAM_PATH"],
+        team_path=raw_team or None,
         app_id=int(raw_app_id) if raw_app_id else None,
     )
+
+
+def save_team_path(team_path: str, cwd: Path | None = None) -> None:
+    """Persist APPLIKU_TEAM_PATH to .env.appliku."""
+    base = cwd or Path.cwd()
+    env_file = base / ENV_FILENAME
+    values = _parse_env_file(env_file) if env_file.exists() else {}
+    values["APPLIKU_TEAM_PATH"] = team_path
+    _write_env_file(env_file, values)
+    logger.info("APPLIKU_TEAM_PATH=%s saved to %s", team_path, env_file)
 
 
 def save_app_id(app_id: int, cwd: Path | None = None) -> None:
@@ -85,12 +88,9 @@ def _parse_env_file(path: Path) -> dict[str, str]:
 
 
 def _prompt_and_write(env_file: Path) -> dict[str, str]:
-    print(f"No {ENV_FILENAME} found. Please enter your Appliku credentials:")
+    print(f"No {ENV_FILENAME} found. Please enter your Appliku API key:")
     api_key = input("APPLIKU_API_KEY: ").strip()
-    team_path = input(
-        "APPLIKU_TEAM_PATH (find it in the Appliku dashboard URL, e.g. app.appliku.com/t/<slug>/): "
-    ).strip()
-    values = {"APPLIKU_API_KEY": api_key, "APPLIKU_TEAM_PATH": team_path}
+    values = {"APPLIKU_API_KEY": api_key}
     _write_env_file(env_file, values)
     return values
 

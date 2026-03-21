@@ -12,6 +12,7 @@ from appliku_cli.credentials import (
     _parse_env_file,
     load_credentials,
     save_app_id,
+    save_team_path,
 )
 
 
@@ -57,22 +58,34 @@ def test_load_credentials_without_app_id(tmp_path):
 
 def test_load_credentials_prompts_when_missing(tmp_path):
     (tmp_path / GITIGNORE_FILENAME).write_text(f"{ENV_FILENAME}\n")
-    inputs = iter(["mykey", "their-team"])
-    with patch("builtins.input", side_effect=inputs):
+    with patch("builtins.input", return_value="mykey"):
         creds = load_credentials(cwd=tmp_path)
     assert creds.api_key == "mykey"
-    assert creds.team_path == "their-team"
+    assert creds.team_path is None  # not prompted — handled by ensure_team_path
     assert creds.app_id is None  # not prompted — handled by ensure_app_id
 
 
 def test_load_credentials_writes_env_file_after_prompt(tmp_path):
     (tmp_path / GITIGNORE_FILENAME).write_text(f"{ENV_FILENAME}\n")
-    inputs = iter(["mykey", "their-team"])
-    with patch("builtins.input", side_effect=inputs):
+    with patch("builtins.input", return_value="mykey"):
         load_credentials(cwd=tmp_path)
     env_file = tmp_path / ENV_FILENAME
     assert env_file.exists()
     assert "APPLIKU_API_KEY=mykey" in env_file.read_text()
+
+
+def test_save_team_path_appends_when_missing(tmp_path):
+    env_file = tmp_path / ENV_FILENAME
+    env_file.write_text("APPLIKU_API_KEY=k\n")
+    save_team_path("my-team", cwd=tmp_path)
+    assert "APPLIKU_TEAM_PATH=my-team" in env_file.read_text()
+
+
+def test_load_credentials_team_path_optional(tmp_path):
+    env_file = tmp_path / ENV_FILENAME
+    env_file.write_text("APPLIKU_API_KEY=k\n")
+    creds = load_credentials(cwd=tmp_path)
+    assert creds.team_path is None
 
 
 def test_save_app_id_appends_when_missing(tmp_path):

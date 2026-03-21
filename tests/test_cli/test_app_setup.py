@@ -14,6 +14,7 @@ from appliku_cli.app_setup import (
     create_new_app,
     detect_git_remote,
     ensure_app_id,
+    ensure_team_path,
 )
 from appliku_cli.credentials import Credentials
 
@@ -266,3 +267,46 @@ def test_ensure_app_id_creates_new_app_on_blank_input(tmp_path):
     assert app_id == 99
     mock_create.assert_called_once()
     assert "APPLIKU_APP_ID=99" in (tmp_path / ".env.appliku").read_text()
+
+
+# ── ensure_team_path ──────────────────────────────────────────────────────────
+
+def test_ensure_team_path_returns_existing(tmp_path):
+    creds = Credentials(api_key="k", team_path="my-team", app_id=None)
+    client = MagicMock()
+    result = ensure_team_path(creds, client, cwd=tmp_path)
+    assert result == "my-team"
+    client.list_teams.assert_not_called()
+
+
+def test_ensure_team_path_single_team_auto_selected(tmp_path):
+    (tmp_path / ".env.appliku").write_text("APPLIKU_API_KEY=k\n")
+    creds = Credentials(api_key="k", team_path=None, app_id=None)
+    client = MagicMock()
+    client.list_teams.return_value = [{"id": 1, "name": "My Team", "team_path": "my-team"}]
+    result = ensure_team_path(creds, client, cwd=tmp_path)
+    assert result == "my-team"
+    assert creds.team_path == "my-team"
+    assert client._team_path == "my-team"
+    assert "APPLIKU_TEAM_PATH=my-team" in (tmp_path / ".env.appliku").read_text()
+
+
+def test_ensure_team_path_multiple_prompts_user(tmp_path):
+    (tmp_path / ".env.appliku").write_text("APPLIKU_API_KEY=k\n")
+    creds = Credentials(api_key="k", team_path=None, app_id=None)
+    client = MagicMock()
+    client.list_teams.return_value = [
+        {"id": 1, "name": "Personal", "team_path": "personal"},
+        {"id": 2, "name": "Work", "team_path": "work-team"},
+    ]
+    with patch("builtins.input", return_value="2"):
+        result = ensure_team_path(creds, client, cwd=tmp_path)
+    assert result == "work-team"
+
+
+def test_ensure_team_path_raises_when_no_teams(tmp_path):
+    creds = Credentials(api_key="k", team_path=None, app_id=None)
+    client = MagicMock()
+    client.list_teams.return_value = []
+    with pytest.raises(RuntimeError, match="No teams"):
+        ensure_team_path(creds, client, cwd=tmp_path)

@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from appliku_cli.api import ApplikuClient
-from appliku_cli.credentials import Credentials, save_app_id
+from appliku_cli.credentials import Credentials, save_app_id, save_team_path
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +166,50 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
     app_id = int(result["id"])
     logger.info("App created: id=%s name=%s", app_id, app_name)
     return app_id
+
+
+def ensure_team_path(
+    credentials: Credentials,
+    client: ApplikuClient,
+    cwd: Path | None = None,
+) -> str:
+    """Return a valid team_path, auto-discovering it from the API if not set.
+
+    If credentials.team_path is already set, returns it immediately.
+    If the account has exactly one team, uses it automatically.
+    If there are multiple teams, prompts the user to pick one.
+    Persists the result to .env.appliku.
+    """
+    if credentials.team_path:
+        return credentials.team_path
+
+    teams = client.list_teams()
+    if not teams:
+        raise RuntimeError("No teams found on your Appliku account.")
+
+    if len(teams) == 1:
+        team_path = teams[0]["team_path"]
+        logger.info("Using team %r (team_path=%s)", teams[0]["name"], team_path)
+    else:
+        print("\nAvailable teams:")
+        for i, t in enumerate(teams):
+            print(f"  [{i + 1}] {t['name']}  (team_path={t['team_path']})")
+        while True:
+            choice = input(f"Select team [1–{len(teams)}]: ").strip()
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(teams):
+                    team_path = teams[idx]["team_path"]
+                    break
+            except ValueError:
+                pass
+            print("Invalid choice, please try again.")
+
+    cwd = cwd or Path.cwd()
+    save_team_path(team_path, cwd)
+    credentials.team_path = team_path
+    client._team_path = team_path  # noqa: SLF001
+    return team_path
 
 
 def ensure_app_id(
