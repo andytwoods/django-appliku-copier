@@ -58,7 +58,10 @@ class ApplikuClient:
         team_path = self._require_team_path()
         logger.info("Listing clusters for team %r", team_path)
         url = f"{BASE_URL}/api/team/{team_path}/clusters"
-        return self._check(self._session.get(url))
+        result = self._check(self._session.get(url))
+        if isinstance(result, dict) and "results" in result:
+            return result["results"]
+        return result if isinstance(result, list) else []
 
     def list_github_repos(self) -> list[str]:
         """GET /api/github/repositories/ — returns list of 'owner/repo' strings."""

@@ -118,11 +118,11 @@ def test_pick_cluster_multiple_prompts_user():
         assert _pick_cluster(client) == 8
 
 
-def test_pick_cluster_raises_when_empty():
+def test_pick_cluster_prompts_manually_when_empty():
     client = MagicMock()
     client.list_clusters.return_value = []
-    with pytest.raises(RuntimeError, match="No clusters"):
-        _pick_cluster(client)
+    with patch("builtins.input", return_value="42"):
+        assert _pick_cluster(client) == 42
 
 
 # ── _resolve_github_repo ──────────────────────────────────────────────────────

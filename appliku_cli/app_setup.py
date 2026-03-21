@@ -73,27 +73,33 @@ def _current_branch(cwd: Path) -> str:
 
 def _pick_cluster(client: ApplikuClient) -> int:
     clusters = client.list_clusters()
-    if not clusters:
-        raise RuntimeError(
-            "No clusters found on your Appliku account.\n"
-            "A cluster is a server that Appliku deploys your app to.\n"
-            "Add one at: https://app.appliku.com/clusters/"
-        )
-    if len(clusters) == 1:
-        logger.info("Using cluster %r (id=%s)", clusters[0]["name"], clusters[0]["id"])
-        return int(clusters[0]["id"])
-    print("\nAvailable clusters:")
-    for i, c in enumerate(clusters):
-        print(f"  [{i + 1}] {c['name']}  (id={c['id']}, apps={c.get('apps_count', '?')})")
+    if clusters:
+        if len(clusters) == 1:
+            logger.info("Using cluster %r (id=%s)", clusters[0]["name"], clusters[0]["id"])
+            return int(clusters[0]["id"])
+        print("\nAvailable clusters:")
+        for i, c in enumerate(clusters):
+            print(f"  [{i + 1}] {c['name']}  (id={c['id']}, apps={c.get('apps_count', '?')})")
+        while True:
+            choice = input(f"Select cluster [1–{len(clusters)}]: ").strip()
+            try:
+                idx = int(choice) - 1
+                if 0 <= idx < len(clusters):
+                    return int(clusters[idx]["id"])
+            except ValueError:
+                pass
+            print("Invalid choice, please try again.")
+
+    # API returned no clusters — ask the user to enter the ID manually
+    print("\nCould not retrieve clusters from the Appliku API.")
+    print("Find your cluster ID at: https://app.appliku.com/clusters/")
+    print("(click your cluster — the ID is in the URL)")
     while True:
-        choice = input(f"Select cluster [1–{len(clusters)}]: ").strip()
+        raw = input("Cluster ID: ").strip()
         try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(clusters):
-                return int(clusters[idx]["id"])
+            return int(raw)
         except ValueError:
-            pass
-        print("Invalid choice, please try again.")
+            print("Please enter a numeric cluster ID.")
 
 
 def _resolve_github_repo(client: ApplikuClient, repo_path: str) -> str:
