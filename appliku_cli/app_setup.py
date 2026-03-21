@@ -56,6 +56,21 @@ def detect_git_remote(cwd: Path) -> tuple[str, str | None]:
     return "custom", None
 
 
+def _git_repo_root(cwd: Path) -> Path:
+    """Return the root of the git repository containing cwd, or cwd itself."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return Path(result.stdout.strip())
+    except subprocess.CalledProcessError:
+        return cwd
+
+
 def _current_branch(cwd: Path) -> str:
     try:
         result = subprocess.run(
