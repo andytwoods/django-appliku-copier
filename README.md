@@ -268,6 +268,20 @@ uv run --group dev pytest tests/test_cli/ -v
    uv run --group dev pytest tests/test_snapshots.py --snapshot-update
    ```
 
+### Trying the Copier template interactively
+
+Run `copier copy` with `--overwrite` from the example project to re-answer
+all questions and regenerate the files in place:
+
+```bash
+cd example/demo_project
+copier copy ../../template . --overwrite
+```
+
+This prompts for every question fresh and overwrites the generated files —
+no need to delete `.copier-answers.yml` first. Useful for checking how the
+generated output looks for different combinations of answers.
+
 ### Testing `appliku-setup` against a real Appliku account
 
 Install the package in editable mode:
