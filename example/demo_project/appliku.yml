@@ -6,7 +6,7 @@ build_settings:
     - name: DATABASE_URL
       from_database:
         name: db
-        property: private_connection_url
+        property: connection_url
     - name: ALLOWED_HOSTS
       from_domains: true
     - name: SECRET_KEY
