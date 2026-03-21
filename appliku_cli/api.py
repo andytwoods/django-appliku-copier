@@ -149,7 +149,8 @@ class ApplikuClient:
         app_id = self._require_app_id()
         logger.info("Setting config vars: %s", list(vars.keys()))
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/config-vars"
-        self._check(self._session.patch(url, json=vars))
+        payload = {"env_vars": [{"name": k, "value": v} for k, v in vars.items()]}
+        self._check(self._session.patch(url, json=payload))
 
     def create_volume(self, name: str, target: str) -> dict:
         """POST /api/team/{team_path}/applications/{app_id}/volumes"""
@@ -157,7 +158,7 @@ class ApplikuClient:
         app_id = self._require_app_id()
         logger.info("Creating volume name=%r target=%r", name, target)
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/volumes"
-        return self._check(self._session.post(url, json={"name": name, "target": target}))
+        return self._check(self._session.post(url, json={"name": name, "container_path": target}))
 
     def trigger_deploy(self) -> dict:
         """POST /api/team/{team_path}/applications/{app_id}/deploy"""

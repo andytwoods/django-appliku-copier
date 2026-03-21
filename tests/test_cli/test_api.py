@@ -138,7 +138,7 @@ def test_set_config_vars_success(client):
     responses_lib.add(responses_lib.PATCH, url, json={}, status=200)
     client.set_config_vars({"SECRET_KEY": "abc123"})
     body = json.loads(responses_lib.calls[0].request.body)
-    assert body["SECRET_KEY"] == "abc123"
+    assert body["env_vars"] == [{"name": "SECRET_KEY", "value": "abc123"}]
 
 
 @responses_lib.activate
@@ -157,7 +157,7 @@ def test_create_volume_success(client):
     result = client.create_volume(name="media", target="/app/media/")
     assert result["id"] == 5
     body = json.loads(responses_lib.calls[0].request.body)
-    assert body["target"] == "/app/media/"
+    assert body["container_path"] == "/app/media/"
 
 
 @responses_lib.activate
