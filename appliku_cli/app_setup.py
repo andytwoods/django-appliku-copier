@@ -160,19 +160,39 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
     app_name = _sanitize_app_name(project_slug)
     branch = _current_branch(cwd)
 
+    # Detect if cwd is a subdirectory of the git repo root and set paths accordingly
+    repo_root = _git_repo_root(cwd)
+    try:
+        rel = cwd.relative_to(repo_root)
+    except ValueError:
+        rel = None
+    if rel and str(rel) != ".":
+        dockerfile_context_path = str(rel)
+        yml_config_file_path = f"{rel}/appliku.yml"
+        logger.info("App is in subdirectory %r — setting dockerfile_context_path", str(rel))
+    else:
+        dockerfile_context_path = None
+        yml_config_file_path = "appliku.yml"
+
     logger.info("Detecting git remote in %s", cwd)
     provider, repo_path = detect_git_remote(cwd)
 
     cluster_id, server_id = _pick_deployment_target(client)
 
+    common_kwargs = dict(
+        name=app_name,
+        branch=branch,
+        cluster_id=cluster_id,
+        server_id=server_id,
+        dockerfile_context_path=dockerfile_context_path,
+        yml_config_file_path=yml_config_file_path,
+    )
+
     if provider == "github":
         logger.info("Resolving GitHub repository: %s", repo_path)
         resolved = _resolve_github_repo(client, repo_path)
         result = client.create_app(
-            name=app_name,
-            branch=branch,
-            cluster_id=cluster_id,
-            server_id=server_id,
+            **common_kwargs,
             repository_provider="github",
             repository_name=resolved,
         )
@@ -181,10 +201,7 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
         logger.info("Resolving GitLab repository: %s", repo_path)
         gitlab_id = _resolve_gitlab_repo_id(client, repo_path)
         result = client.create_app(
-            name=app_name,
-            branch=branch,
-            cluster_id=cluster_id,
-            server_id=server_id,
+            **common_kwargs,
             repository_provider="gitlab",
             gitlab_repository_id=gitlab_id,
         )
@@ -193,10 +210,7 @@ def create_new_app(client: ApplikuClient, answers: dict, cwd: Path) -> int:
         logger.warning("Remote is not GitHub or GitLab — using custom provider")
         custom_url = input("Git clone URL (for Appliku custom provider): ").strip()
         result = client.create_app(
-            name=app_name,
-            branch=branch,
-            cluster_id=cluster_id,
-            server_id=server_id,
+            **common_kwargs,
             repository_provider="custom",
             custom_git_url=custom_url,
         )
