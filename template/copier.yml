@@ -16,6 +16,14 @@ python_version:
     help: "Python version for the Dockerfile base image (e.g. 3.12)"
     default: "3.12"
 
+web_server:
+    type: str
+    help: "WSGI/ASGI server used to run Django"
+    choices:
+        - gunicorn
+        - uvicorn
+    default: gunicorn
+
 # ── Database ──────────────────────────────────────────────────────────────────
 
 db_type:

@@ -9,9 +9,11 @@ everything on the platform for you.
 
 There are two separate steps:
 
-**Step 1 — `copier copy`** generates deployment files for your project:
-`Dockerfile`, `appliku.yml`, `run.sh`, `release.sh`, and optionally
-`celery-worker.sh` / `celery-beat.sh`. You commit these files to git.
+**Step 1 — `copier copy`** asks you about your project's infrastructure needs
+(database variant, task runner, media storage, etc.) and generates deployment
+files tailored to your answers: `Dockerfile`, `appliku.yml`, `run.sh`,
+`release.sh`, and optionally `celery-worker.sh` / `celery-beat.sh`.
+You commit these files to git.
 
 **Step 2 — `appliku-setup`** connects to Appliku and does the one-time setup:
 creates the app, provisions databases and queues, pushes config vars,
@@ -23,7 +25,7 @@ and triggers the first deploy.
 
 - Python 3.11+
 - [Copier](https://copier.readthedocs.io/) 9.0+
-- An existing Django project with `gunicorn` and `whitenoise` installed
+- An existing Django project
 - An [Appliku](https://appliku.com) account with your GitHub or GitLab repo
   connected under **Settings → Git Integrations**
 
@@ -51,6 +53,7 @@ Copier asks a series of questions:
 | Project name | any string | — |
 | Project slug | Python module name (e.g. `my_app`) | derived from name |
 | Python version | e.g. `3.12` | `3.12` |
+| Web server | `gunicorn`, `uvicorn` | `gunicorn` |
 | Database | `postgresql_17/16/15/18`, `postgis_16_34`, `postgresql_16_pgvector`, `timescale_db_17`, `mysql_8` | `postgresql_17` |
 | Task runner | `none`, `celery`, `huey` | `none` |
 | Celery broker | `redis`, `rabbitmq` | `redis` *(if Celery)* |
@@ -111,11 +114,16 @@ before deploying.
 **Packages** (`requirements.txt`):
 
 ```
-gunicorn
-whitenoise
 psycopg2-binary
 django-environ        # or dj-database-url
+gunicorn              # if you chose gunicorn (default)
+uvicorn               # if you chose uvicorn
 ```
+
+The generated `release.sh` runs `collectstatic`. If you use
+[whitenoise](https://whitenoise.readthedocs.io/) for static files (recommended
+for simplicity), add it to your requirements and middleware. If you serve
+static files another way (S3, CDN, etc.), ignore the whitenoise references.
 
 Add these based on your choices:
 

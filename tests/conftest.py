@@ -11,6 +11,7 @@ BASE_DATA: dict[str, Any] = {
     "project_name": "Test Project",
     "project_slug": "test_project",
     "python_version": "3.12",
+    "web_server": "gunicorn",
     "db_type": "postgresql_17",
     "task_runner": "none",
     "media_storage": "none",

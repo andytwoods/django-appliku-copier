@@ -51,6 +51,23 @@ def test_beat_shebang(render, overrides, expect_worker, expect_beat):
     assert first_line == "#!/usr/bin/env bash", "Shebang must be on line 1"
 
 
+def test_run_sh_gunicorn(render):
+    dest = render({"web_server": "gunicorn"})
+    content = (dest / "run.sh").read_text()
+    assert "gunicorn" in content
+    assert "uvicorn" not in content
+    assert content.splitlines()[0] == "#!/usr/bin/env bash"
+
+
+def test_run_sh_uvicorn(render):
+    dest = render({"web_server": "uvicorn"})
+    content = (dest / "run.sh").read_text()
+    assert "uvicorn" in content
+    assert "gunicorn" not in content
+    assert "asgi" in content
+    assert content.splitlines()[0] == "#!/usr/bin/env bash"
+
+
 @pytest.mark.parametrize("overrides,expect_worker,expect_beat", MATRIX)
 def test_appliku_yml_snapshot(render, overrides, expect_worker, expect_beat, snapshot):
     dest = render(overrides)
