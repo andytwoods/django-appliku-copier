@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from appliku_cli.api import ApplikuClient
+from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.app_setup import ensure_app_id, ensure_team_path
 from appliku_cli.credentials import load_credentials
 from appliku_cli.provision import run_provision
@@ -52,8 +52,20 @@ def main() -> None:
     ensure_team_path(credentials, client)
     ensure_app_id(credentials, client, answers)
 
-    run_provision(credentials, answers)
-    print("Appliku setup complete.")
+    try:
+        run_provision(credentials, answers)
+    except ApplikuAPIError as exc:
+        if "doesn't exist" in exc.body or "does not exist" in exc.body:
+            print(
+                "\nError: Appliku can't find the app referenced by APPLIKU_APP_ID "
+                f"({credentials.app_id}).\n"
+                "It may have been deleted from the Appliku dashboard.\n\n"
+                "To fix:\n"
+                "  1. Remove APPLIKU_APP_ID from .env.appliku\n"
+                "  2. Re-run appliku-setup  (a new app will be created)"
+            )
+            sys.exit(1)
+        raise
 
 
 if __name__ == "__main__":
