@@ -33,8 +33,8 @@ and triggers the first deploy.
 Install Copier if you don't have it:
 
 ```bash
-pip install copier
-# or: uv tool install copier
+uv tool install copier
+# or: pip install copier
 ```
 
 ---
@@ -79,8 +79,8 @@ git commit -m "Add Appliku deployment files"
 Install this package:
 
 ```bash
-pip install djangoappliku
-# or: uv add djangoappliku
+uv add djangoappliku
+# or: pip install djangoappliku
 ```
 
 Run from your Django project directory:
@@ -274,12 +274,14 @@ Install the package in editable mode:
 
 ```bash
 uv pip install -e .
+# or: pip install -e .
 ```
 
-Then run it from inside any Django project that has a `.copier-answers.yml`:
+Then run it from inside the included example project (which already has
+`.copier-answers.yml` and all generated files in place):
 
 ```bash
-cd /path/to/your/django/project
+cd example/demo_project
 appliku-setup
 ```
 
