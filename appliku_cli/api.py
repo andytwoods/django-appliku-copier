@@ -124,6 +124,14 @@ class ApplikuClient:
 
     # ── App-level (app_id required) ───────────────────────────────────────────
 
+    def list_datastores(self) -> list[dict]:
+        """GET /api/team/{team_path}/applications/{app_id}/datastores"""
+        team_path = self._require_team_path()
+        app_id = self._require_app_id()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/datastores"
+        result = self._check(self._session.get(url))
+        return result if isinstance(result, list) else []
+
     def create_datastore(
         self,
         name: str,

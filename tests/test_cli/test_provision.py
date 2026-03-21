@@ -12,6 +12,7 @@ def _run(answers: dict, extra_prompts: list[str] | None = None) -> MagicMock:
     """Run provision with a mocked client and return the mock."""
     prompts = iter(extra_prompts or [])
     mock_client = MagicMock()
+    mock_client.list_datastores.return_value = []
     with (
         patch("appliku_cli.provision.ApplikuClient", return_value=mock_client),
         patch("appliku_cli.provision._prompt", side_effect=prompts),

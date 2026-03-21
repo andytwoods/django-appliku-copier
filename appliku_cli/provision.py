@@ -85,6 +85,18 @@ def run_provision(credentials: Credentials, answers: dict) -> None:
         task_runner == "huey" or celery_broker == "redis"
     )
 
+    # Guard: abort if the app already has datastores (means it was already provisioned)
+    existing = client.list_datastores()
+    if existing:
+        print(
+            "\nThis app has already been provisioned (datastores already exist).\n"
+            "To start fresh:\n"
+            "  1. Delete the app at https://app.appliku.com\n"
+            f"  2. Remove APPLIKU_APP_ID from .env.appliku\n"
+            "  3. Re-run appliku-setup"
+        )
+        return
+
     # Brief pause to allow Appliku to finish setting up the newly created app
     time.sleep(8)
 
