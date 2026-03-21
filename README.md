@@ -275,7 +275,7 @@ all questions and regenerate the files in place:
 
 ```bash
 cd example/demo_project
-copier copy ../../template . --overwrite
+copier copy ../../template . --overwrite --trust
 ```
 
 This prompts for every question fresh and overwrites the generated files —
