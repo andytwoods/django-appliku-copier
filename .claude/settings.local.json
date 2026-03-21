@@ -12,7 +12,9 @@
       "Bash(uv pip:*)",
       "Bash(/Users/andytwoods/PycharmProjects/DjangoAppliku/README.md:*)",
       "Bash(uv lock:*)",
-      "Bash(xargs sed:*)"
+      "Bash(xargs sed:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git push:*)"
     ]
   }
 }
