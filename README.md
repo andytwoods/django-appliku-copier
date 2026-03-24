@@ -83,6 +83,13 @@ uv add djangoappliku
 # or: pip install djangoappliku
 ```
 
+If the package is not yet on PyPI, install directly from GitHub:
+
+```bash
+uv add git+https://github.com/andytwoods/django-appliku-copier.git
+# or: pip install git+https://github.com/andytwoods/django-appliku-copier.git
+```
+
 Run from your Django project directory:
 
 ```bash
