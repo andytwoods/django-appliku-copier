@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "template"
+TEMPLATE_DIR = Path(__file__).resolve().parent.parent  # repo root; copier.yml + _subdirectory: template
 
 BASE_DATA: dict[str, Any] = {
     "project_slug": "test_project",
@@ -17,6 +17,7 @@ BASE_DATA: dict[str, Any] = {
     "media_storage": "none",
     "email_backend": "console",
     "use_sentry": "false",
+    "superuser_email": "",
 }
 
 

@@ -77,6 +77,7 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     media_storage: str = answers.get("media_storage", "none")
     email_backend: str = answers.get("email_backend", "console")
     use_sentry: bool = _bool(answers.get("use_sentry", False))
+    superuser_email: str = answers.get("superuser_email", "").strip()
 
     # If neither server nor cluster is set (e.g. app was pre-existing), discover now
     server_id: int | None = credentials.server_id
@@ -98,6 +99,11 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     if domains:
         config_vars["ALLOWED_HOSTS"] = ",".join(domains)
         config_vars["CSRF_TRUSTED_ORIGINS"] = ",".join(f"https://{d}" for d in domains)
+    superuser_password: str | None = None
+    if superuser_email:
+        superuser_password = secrets.token_urlsafe(12)
+        config_vars["SUPERUSER_EMAIL"] = superuser_email
+        config_vars["SUPERUSER_PASSWORD"] = superuser_password
     push_vars(config_vars)
     print("      ✓ Done")
     step += 1
@@ -129,6 +135,18 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     client.trigger_deploy()
 
     save_provisioned(cwd=cwd)
+
+    if superuser_email and superuser_password:
+        print("\n" + "=" * 50)
+        print("  SUPERUSER CREDENTIALS")
+        print(f"  Email:    {superuser_email}")
+        print(f"  Password: {superuser_password}")
+        print("=" * 50)
+        print("  Save this password — it won't be shown again.")
+        print("  After your first deploy completes, remove")
+        print("  SUPERUSER_EMAIL and SUPERUSER_PASSWORD from")
+        print("  Appliku → App → Environment Variables.")
+        print("=" * 50 + "\n")
 
     print("\nAppliku setup complete.")
     if domains:

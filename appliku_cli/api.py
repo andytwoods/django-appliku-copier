@@ -155,6 +155,14 @@ class ApplikuClient:
             payload["cluster"] = cluster_id
         return self._check(self._session.post(url, json=payload))
 
+    def get_config_vars(self) -> list[dict]:
+        """GET /api/team/{team_path}/applications/{app_id}/config-vars"""
+        team_path = self._require_team_path()
+        app_id = self._require_app_id()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/config-vars"
+        result = self._check(self._session.get(url))
+        return result.get("env_vars", [])
+
     def set_config_vars(self, vars: dict[str, str]) -> None:
         """PATCH /api/team/{team_path}/applications/{app_id}/config-vars"""
         team_path = self._require_team_path()
@@ -163,6 +171,21 @@ class ApplikuClient:
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/config-vars"
         payload = {"env_vars": [{"name": k, "value": v} for k, v in vars.items()]}
         self._check(self._session.patch(url, json=payload))
+
+    def delete_config_vars(self, names: list[str]) -> None:
+        """Remove config vars by name (fetches current vars and PATCHes without the removed ones)."""
+        team_path = self._require_team_path()
+        app_id = self._require_app_id()
+        logger.info("Deleting config vars: %s", names)
+        names_set = set(names)
+        current = self.get_config_vars()
+        remaining = [
+            {"name": v["name"], "value": v["value"], "mode": v.get("mode")}
+            for v in current
+            if v["name"] not in names_set
+        ]
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/config-vars"
+        self._check(self._session.patch(url, json={"env_vars": remaining}))
 
     def create_volume(self, name: str, target: str) -> dict:
         """POST /api/team/{team_path}/applications/{app_id}/volumes"""

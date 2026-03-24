@@ -64,6 +64,7 @@ Copier asks a series of questions:
 | Media storage | `none`, `s3_compatible`, `volume` | `none` |
 | Email backend | `console`, `smtp`, `sendgrid`, `mailgun`, `ses` | `console` |
 | Sentry? | yes/no | `no` |
+| Superuser email | email address (leave blank to skip) | *(blank)* |
 
 After answering, commit the generated files before moving on:
 
@@ -76,24 +77,16 @@ git commit -m "Add Appliku deployment files"
 
 ## Step 2 — provision Appliku
 
-Install this package:
+Run from your Django project directory (no installation needed):
 
 ```bash
-uv add djangoappliku
-# or: pip install djangoappliku
+uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-setup
 ```
 
-If the package is not yet on PyPI, install directly from GitHub:
+Once the package is on PyPI this shortens to:
 
 ```bash
-uv add git+https://github.com/andytwoods/django-appliku-copier.git
-# or: pip install git+https://github.com/andytwoods/django-appliku-copier.git
-```
-
-Run from your Django project directory:
-
-```bash
-appliku-setup
+uvx djangoappliku appliku-setup
 ```
 
 On first run it will:
@@ -108,7 +101,13 @@ On first run it will:
    - **Existing app**: enter the app ID from your Appliku dashboard URL
 4. Provision your database, Redis, RabbitMQ, or media volume as configured
 5. Generate a `SECRET_KEY`, push all config vars to Appliku
-6. Trigger the first deployment
+6. If you provided a superuser email: generate a random password, push
+   `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD` to Appliku, and **print the
+   credentials to your terminal** — save them, they won't be shown again.
+   The first deploy will create the superuser automatically via `release.sh`.
+   After the deploy completes, remove `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD`
+   from **Appliku → App → Environment Variables**.
+7. Trigger the first deployment
 
 Re-running `appliku-setup` is safe — it reads `.env.appliku` and skips
 anything already configured.

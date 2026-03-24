@@ -111,6 +111,13 @@ use_sentry:
     help: "Configure Sentry error tracking?"
     default: false
 
+# ── Superuser ─────────────────────────────────────────────────────────────────
+
+superuser_email:
+    type: str
+    help: "Email for the initial Django superuser (leave blank to skip)"
+    default: ""
+
 # ── Post-generation cleanup ───────────────────────────────────────────────────
 
 _tasks:
