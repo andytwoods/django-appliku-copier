@@ -44,7 +44,7 @@ uv tool install copier
 Run inside your Django project directory:
 
 ```bash
-copier copy gh:andytwoods/djangoappliku . --trust
+copier copy gh:andytwoods/django-appluku-copier . --trust
 ```
 
 Copier asks a series of questions:
@@ -220,8 +220,8 @@ tests/              Snapshot tests, YAML validation, Django check
 ### Setup
 
 ```bash
-git clone https://github.com/andytwoods/djangoappliku
-cd djangoappliku
+git clone https://github.com/andytwoods/django-appliku-copier.git
+cd django-appliku-copier
 uv sync --group dev
 ```
 
