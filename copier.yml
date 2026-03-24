@@ -10,7 +10,7 @@ project_slug:
 python_version:
     type: str
     help: "Python version for the Dockerfile base image (e.g. 3.13)"
-    default: "3.13"
+    default: "3.14"
 
 package_manager:
     type: str
