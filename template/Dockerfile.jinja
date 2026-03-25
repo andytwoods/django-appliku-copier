@@ -9,7 +9,7 @@ RUN apt-get update \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock ./
-RUN UV_PROJECT_ENVIRONMENT=/usr/local uv sync --frozen --no-dev
+RUN UV_PROJECT_ENVIRONMENT=/usr/local uv sync --frozen --no-dev --extra production
 
 COPY . .
 {% else %}
@@ -18,4 +18,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 {% endif %}
+RUN SECRET_KEY=build-only python manage.py collectstatic --noinput
+
 EXPOSE 8000

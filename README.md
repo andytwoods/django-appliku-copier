@@ -44,8 +44,7 @@ uv tool install copier
 Run inside your Django project directory:
 
 ```bash
-copier copy gh:andytwoods/django-appluku-copier . --trust
-```
+all```
 
 Copier asks a series of questions:
 
@@ -119,16 +118,22 @@ anything already configured.
 The template does not touch your Django source files. You need these in place
 before deploying.
 
-**Packages** — add to `pyproject.toml` (uv) or `requirements.txt` (pip):
+**Packages** — if using uv, put production dependencies in an `[project.optional-dependencies]` group called `production` in `pyproject.toml`. The generated Dockerfile runs `uv sync --extra production`, so anything needed at runtime must be there:
 
-```
-psycopg2-binary
-django-environ        # or dj-database-url
-gunicorn              # if you chose gunicorn (default)
-uvicorn               # if you chose uvicorn
+```toml
+[project.optional-dependencies]
+production = [
+    "psycopg2-binary",
+    "django-environ",
+    "whitenoise",
+    "gunicorn",    # if you chose gunicorn (default)
+    "uvicorn",     # if you chose uvicorn
+]
 ```
 
-The generated `release.sh` runs `collectstatic`. If you use
+If using pip, add the same packages to `requirements.txt`.
+
+The generated `Dockerfile` runs `collectstatic` at build time so static files are baked into the image. If you use
 [whitenoise](https://whitenoise.readthedocs.io/) for static files (recommended
 for simplicity), add it to your requirements and middleware. If you serve
 static files another way (S3, CDN, etc.), ignore the whitenoise references.
