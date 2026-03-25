@@ -44,7 +44,8 @@ uv tool install copier
 Run inside your Django project directory:
 
 ```bash
-all```
+copier copy gh:andytwoods/django-appluku-copier . --trust
+```
 
 Copier asks a series of questions:
 
