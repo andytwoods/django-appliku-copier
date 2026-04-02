@@ -56,7 +56,7 @@ Copier asks a series of questions:
 | Python version | e.g. `3.13` | `3.13` |
 | Package manager | `uv`, `pip` | `uv` |
 | Web server | `gunicorn`, `uvicorn` | `gunicorn` |
-| Database | `postgresql_17/16/15/18`, `postgis_16_34`, `postgresql_16_pgvector`, `timescale_db_17`, `mysql_8` | `postgresql_17` |
+| Database | `postgresql_18/17/16/15`, `postgis_16_34`, `postgresql_16_pgvector`, `timescale_db_17`, `mysql_8` | `postgresql_18` |
 | Task runner | `none`, `celery`, `huey` | `none` |
 | Celery broker | `redis`, `rabbitmq` | `redis` *(if Celery)* |
 | Redis version | `8`, `7`, `6` | `8` *(if Redis needed)* |
@@ -83,12 +83,6 @@ Run from your Django project directory (no installation needed):
 uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-setup
 ```
 
-Once the package is on PyPI this shortens to:
-
-```bash
-uvx djangoappliku appliku-setup
-```
-
 On first run it will:
 
 1. Check `.env.appliku` for your **API key** — if missing, it will ask for it
@@ -112,6 +106,27 @@ On first run it will:
 Re-running `appliku-setup` is safe — it reads `.env.appliku` and skips
 anything already configured.
 
+### Troubleshooting first deploy
+
+**502 Bad Gateway after a successful deployment** — nginx may still be pointing
+at a stale port from a previous app on the same server. Trigger a second deploy
+from the Appliku dashboard (no code change needed) and it will resolve.
+
+**`port is already allocated` build failure** — a container from a previously
+deleted app is still running on the server. SSH in and find it:
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Ports}}" | grep <port>
+```
+
+Then remove it:
+
+```bash
+docker rm -f <container-name>
+```
+
+Redeploy once the port is free.
+
 ---
 
 ## Django project requirements
@@ -119,16 +134,27 @@ anything already configured.
 The template does not touch your Django source files. You need these in place
 before deploying.
 
-**Packages** — if using uv, put production dependencies in an `[project.optional-dependencies]` group called `production` in `pyproject.toml`. The generated Dockerfile runs `uv sync --extra production`, so anything needed at runtime must be there:
+**Packages** — the following must be installed in production. If using uv, you can put them in the main `dependencies` list or in an `[project.optional-dependencies]` group called `production` — the generated Dockerfile detects the `production` group automatically and uses `--extra production` if it exists:
 
 ```toml
-[project.optional-dependencies]
-production = [
+# Option A — simplest: add directly to dependencies
+[project]
+dependencies = [
     "psycopg2-binary",  # or "psycopg[binary]" for psycopg3 — NOT psycopg[c] (requires libpq-dev)
     "django-environ",
     "whitenoise",
     "gunicorn",    # if you chose gunicorn (default)
     "uvicorn",     # if you chose uvicorn
+]
+
+# Option B — separate production group (keeps dev installs lighter)
+[project.optional-dependencies]
+production = [
+    "psycopg2-binary",
+    "django-environ",
+    "whitenoise",
+    "gunicorn",
+    "uvicorn",
 ]
 ```
 

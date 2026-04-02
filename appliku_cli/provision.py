@@ -48,6 +48,92 @@ def _prompt(label: str, default: str | None = None) -> str:
     return value if value else (default or "")
 
 
+_TERMINAL_STATUSES = {"Deployed", "Failed", "Timeout", "Aborted"}
+_POLL_INTERVAL = 10
+_POLL_MAX_ATTEMPTS = 72  # 72 × 10s = 12 minutes
+
+
+def _wait_for_deployment(client: ApplikuClient) -> bool:
+    """Poll the latest deployment until it reaches a terminal status. Returns True on success."""
+    print("\nWaiting for deployment to complete…")
+    last_status = None
+    for attempt in range(_POLL_MAX_ATTEMPTS):
+        try:
+            deployment = client.get_latest_deployment()
+        except ApplikuAPIError:
+            time.sleep(_POLL_INTERVAL)
+            continue
+
+        status = deployment.get("status", "")
+        if status != last_status:
+            print(f"  Status: {status}")
+            last_status = status
+
+        if status in _TERMINAL_STATUSES:
+            if status == "Deployed":
+                print("  ✓ Deployment succeeded.")
+                return True
+            else:
+                print(f"  ✗ Deployment ended with status: {status}")
+                return False
+
+        time.sleep(_POLL_INTERVAL)
+
+    print("  Timed out waiting for deployment.")
+    return False
+
+
+def _check_site(url: str) -> bool:
+    """Return True if the site responds with a non-5xx status code."""
+    import urllib.request
+    import urllib.error
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resp:
+            return resp.status < 500
+    except urllib.error.HTTPError as e:
+        return e.code < 500
+    except Exception:
+        return False
+
+
+def _check_site_and_offer_redeploy(client: ApplikuClient, url: str) -> bool:
+    """Check the site URL; if it fails, offer to redeploy once and recheck.
+
+    Returns True if the site is confirmed working, False otherwise.
+    """
+    print(f"\nChecking site at {url} …")
+    if _check_site(url):
+        print(f"  ✓ Site is up: {url}")
+        return True
+
+    print(
+        "  The site returned an error (often a transient nginx routing issue on first deploy).\n"
+        "  Would you like to trigger a second deployment to fix it? [Y/n] ",
+        end="",
+    )
+    answer = input().strip().lower()
+    if answer in ("", "y", "yes"):
+        print("  Triggering redeploy…")
+        client.trigger_deploy()
+        deployed = _wait_for_deployment(client)
+        if not deployed:
+            print(f"  Redeploy failed. Check the logs at https://app.appliku.com")
+            return False
+        print(f"\nRe-checking {url} …")
+        if _check_site(url):
+            print(f"  ✓ Site is up: {url}")
+            return True
+        else:
+            print(
+                f"  Site still not responding at {url}\n"
+                "  Check the deployment logs at https://app.appliku.com"
+            )
+            return False
+    else:
+        print(f"\nVisit {url} when ready.")
+        return False
+
+
 def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = None) -> None:
     """Run the full Appliku provisioning sequence for a project.
 
@@ -144,10 +230,32 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         print("  Appliku → App → Environment Variables.")
         print("=" * 50 + "\n")
 
+    deployed = _wait_for_deployment(client)
+
+    if deployed:
+        domains = client.list_domains()
+        if domains:
+            url = f"https://{domains[0]}"
+            site_up = _check_site_and_offer_redeploy(client, url)
+        else:
+            site_up = True  # can't verify but deployment succeeded
+            print("\nAppliku setup complete. No domain found to verify — check the dashboard.")
+
+        if site_up and superuser_email:
+            print(
+                "\nWould you like to remove SUPERUSER_EMAIL and SUPERUSER_PASSWORD\n"
+                "from Appliku now that the superuser has been created? [Y/n] ",
+                end="",
+            )
+            if input().strip().lower() in ("", "y", "yes"):
+                client.delete_config_vars(["SUPERUSER_EMAIL", "SUPERUSER_PASSWORD"])
+                print("  ✓ Superuser credentials removed from Appliku environment variables.")
+    else:
+        print(
+            "\nDeployment did not succeed. Check the build logs at:\n"
+            "  https://app.appliku.com"
+        )
+        return
+
     print("\nAppliku setup complete.")
-    print(
-        "\nThe first build is now running. Monitor progress at:\n"
-        "  https://app.appliku.com\n"
-        "\nOnce the build succeeds you can add a custom domain\n"
-        "from the Appliku dashboard."
-    )
+    print("Once you're ready, add a custom domain from the Appliku dashboard.")
