@@ -116,7 +116,7 @@ build_command: "uv sync && uv run python manage.py collectstatic --noinput"
 ```
 django-environ
 gunicorn
-psycopg2-binary   # or psycopg[binary] for psycopg3
+psycopg2-binary   # or psycopg[binary] for psycopg3 — do NOT use psycopg[c]; it requires libpq-dev which is not in slim images
 whitenoise        # for serving static files
 ```
 

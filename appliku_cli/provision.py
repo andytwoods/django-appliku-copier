@@ -95,10 +95,6 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
 
     print(f"[{step}/2] Pushing config vars…")
     config_vars: dict[str, str] = {"SECRET_KEY": secrets.token_urlsafe(50)}
-    domains = client.list_domains()
-    if domains:
-        config_vars["ALLOWED_HOSTS"] = ",".join(domains)
-        config_vars["CSRF_TRUSTED_ORIGINS"] = ",".join(f"https://{d}" for d in domains)
     superuser_password: str | None = None
     if superuser_email:
         superuser_password = secrets.token_urlsafe(12)
@@ -149,9 +145,6 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         print("=" * 50 + "\n")
 
     print("\nAppliku setup complete.")
-    if domains:
-        urls = [f"https://{d}" for d in domains]
-        print(f"Your app will be available at: {', '.join(urls)}")
     print(
         "\nThe first build is now running. Monitor progress at:\n"
         "  https://app.appliku.com\n"

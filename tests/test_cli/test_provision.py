@@ -11,11 +11,10 @@ CREDS = Credentials(api_key="key", team_path="team", app_id=1, server_id=1)
 CREDS_PROVISIONED = Credentials(api_key="key", team_path="team", app_id=1, server_id=1, provisioned=True)
 
 
-def _run(answers: dict, extra_prompts: list[str] | None = None, domains: list[str] | None = None, credentials: Credentials = CREDS) -> MagicMock:
+def _run(answers: dict, extra_prompts: list[str] | None = None, credentials: Credentials = CREDS) -> MagicMock:
     """Run provision with a mocked client and return the mock."""
     prompts = iter(extra_prompts or [])
     mock_client = MagicMock()
-    mock_client.list_domains.return_value = domains or []
     with (
         patch("appliku_cli.provision.ApplikuClient", return_value=mock_client),
         patch("appliku_cli.provision._prompt", side_effect=prompts),
@@ -74,23 +73,6 @@ def test_baseline_does_not_create_datastore():
     """Datastores are handled by appliku.yml — not via API."""
     client = _run({"db_type": "postgresql_18", "task_runner": "none"})
     client.create_datastore.assert_not_called()
-
-
-# ── Domain injection ──────────────────────────────────────────────────────────
-
-def test_domains_push_allowed_hosts():
-    client = _run(
-        {"db_type": "postgresql_18", "task_runner": "none"},
-        domains=["myapp.appliku.app"],
-    )
-    vars = _all_pushed_vars(client)
-    assert vars["ALLOWED_HOSTS"] == "myapp.appliku.app"
-    assert vars["CSRF_TRUSTED_ORIGINS"] == "https://myapp.appliku.app"
-
-
-def test_no_domains_skips_allowed_hosts():
-    client = _run({"db_type": "postgresql_18", "task_runner": "none"})
-    assert "ALLOWED_HOSTS" not in _all_pushed_vars(client)
 
 
 # ── Media storage: S3 ────────────────────────────────────────────────────────

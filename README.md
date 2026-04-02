@@ -124,7 +124,7 @@ before deploying.
 ```toml
 [project.optional-dependencies]
 production = [
-    "psycopg2-binary",
+    "psycopg2-binary",  # or "psycopg[binary]" for psycopg3 — NOT psycopg[c] (requires libpq-dev)
     "django-environ",
     "whitenoise",
     "gunicorn",    # if you chose gunicorn (default)

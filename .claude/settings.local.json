@@ -14,7 +14,12 @@
       "Bash(uv lock:*)",
       "Bash(xargs sed:*)",
       "WebFetch(domain:github.com)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i '' 's/    - name: ALLOWED_HOSTS\\\\n      from_domains: true/    - name: ALLOWED_HOSTS\\\\n      from_domains: true\\\\n    - name: CSRF_TRUSTED_ORIGINS\\\\n      source: manual/' \"$f\")",
+      "Bash(done)",
+      "Bash(grep -l \"ALLOWED_HOSTS\" /Users/andytwoods/PycharmProjects/DjangoAppliku/tests/snapshots/test_snapshots/test_appliku_yml_snapshot/*/appliku.yml)"
     ]
   }
 }
