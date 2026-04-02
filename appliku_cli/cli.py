@@ -5,13 +5,31 @@ import sys
 from pathlib import Path
 
 import yaml
+from colorama import Fore, Style, init as colorama_init
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.app_setup import ensure_app_id, ensure_team_path
 from appliku_cli.credentials import load_credentials
 from appliku_cli.provision import run_provision
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+colorama_init(autoreset=True)
+
+_LEVEL_COLOURS = {
+    "DEBUG": Fore.WHITE + Style.DIM,
+    "INFO": Fore.BLUE,
+    "WARNING": Fore.YELLOW,
+    "ERROR": Fore.RED,
+    "CRITICAL": Fore.RED + Style.BRIGHT,
+}
+
+class _ColouredFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        colour = _LEVEL_COLOURS.get(record.levelname, "")
+        return f"{colour}{record.levelname} {record.getMessage()}{Style.RESET_ALL}"
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_ColouredFormatter())
+logging.basicConfig(level=logging.INFO, handlers=[_handler])
 logger = logging.getLogger(__name__)
 
 COPIER_ANSWERS_FILE = ".copier-answers.yml"

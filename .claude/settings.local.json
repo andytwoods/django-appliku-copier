@@ -21,7 +21,8 @@
       "Bash(done)",
       "Bash(grep -l \"ALLOWED_HOSTS\" /Users/andytwoods/PycharmProjects/DjangoAppliku/tests/snapshots/test_snapshots/test_appliku_yml_snapshot/*/appliku.yml)",
       "WebFetch(domain:api.appliku.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(uv add:*)"
     ]
   }
 }

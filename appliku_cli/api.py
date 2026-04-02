@@ -203,11 +203,25 @@ class ApplikuClient:
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/deploy"
         return self._check(self._session.post(url))
 
+    def get_deployment(self, deployment_id: int) -> dict:
+        """GET /api/team/{team_path}/applications/{app_id}/deployments/{id}"""
+        team_path = self._require_team_path()
+        app_id = self._require_app_id()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/deployments/{deployment_id}"
+        return self._check(self._session.get(url))
+
     def get_latest_deployment(self) -> dict:
         """GET /api/team/{team_path}/applications/{app_id}/deployments/latest"""
         team_path = self._require_team_path()
         app_id = self._require_app_id()
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/deployments/latest"
+        return self._check(self._session.get(url))
+
+    def get_app(self) -> dict:
+        """GET /api/team/{team_path}/applications/{app_id}/"""
+        team_path = self._require_team_path()
+        app_id = self._require_app_id()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/"
         return self._check(self._session.get(url))
 
     def list_domains(self) -> list[str]:

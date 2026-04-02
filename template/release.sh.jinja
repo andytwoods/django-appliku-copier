@@ -1,10 +1,23 @@
 #!/usr/bin/env bash
 set -e
 
+# Fail fast if Django can't load settings (missing env vars, bad config, etc.).
+# No point retrying — this won't fix itself.
+echo "=== Checking Django configuration ==="
+python -c "import django; django.setup()" || {
+    echo "ERROR: Django failed to start. Check your environment variables in Appliku." >&2
+    exit 1
+}
+
 # Wait for the database to be reachable before running migrations.
 # On first deploy Appliku may still be starting the database container.
+echo "=== Running migrations ==="
 for i in $(seq 1 12); do
     python manage.py migrate --noinput && break
+    if [ $i -eq 12 ]; then
+        echo "ERROR: Database still not reachable after 12 attempts. Giving up." >&2
+        exit 1
+    fi
     echo "Database not ready yet, retrying in 10s… ($i/12)"
     sleep 10
 done

@@ -5,8 +5,30 @@ import sys
 import time
 from pathlib import Path
 
+from colorama import Fore, Style, init as colorama_init
+
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.credentials import Credentials, save_deployment_target, save_provisioned
+
+colorama_init(autoreset=True)
+
+def _ok(msg: str) -> str:
+    return f"{Fore.GREEN}{msg}{Style.RESET_ALL}"
+
+def _err(msg: str) -> str:
+    return f"{Fore.RED}{msg}{Style.RESET_ALL}"
+
+def _info(msg: str) -> str:
+    return f"{Fore.CYAN}{msg}{Style.RESET_ALL}"
+
+def _warn(msg: str) -> str:
+    return f"{Fore.YELLOW}{msg}{Style.RESET_ALL}"
+
+def _bold(msg: str) -> str:
+    return f"{Style.BRIGHT}{msg}{Style.RESET_ALL}"
+
+def _log(msg: str) -> str:
+    return f"  {Fore.YELLOW}{Style.DIM}{msg}{Style.RESET_ALL}"
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +43,10 @@ def _bool(value: object) -> bool:
 def _countdown(message: str, seconds: int) -> None:
     """Show a live countdown so the user knows something is happening."""
     for remaining in range(seconds, 0, -1):
-        sys.stdout.write(f"\r  {message} ({remaining}s)…")
+        sys.stdout.write(_info(f"\r  {message} ({remaining}s)…"))
         sys.stdout.flush()
         time.sleep(1)
-    sys.stdout.write(f"\r  {message} — done.          \n")
+    sys.stdout.write(_ok(f"\r  {message} — done.          \n"))
     sys.stdout.flush()
 
 
@@ -35,7 +57,7 @@ def _retry_on_500(label: str, fn, *args, wait: int = 10, retries: int = 3, **kwa
             return fn(*args, **kwargs)
         except ApplikuAPIError as e:
             if e.status_code == 500 and attempt < retries - 1:
-                print(f"  Appliku not ready yet — retrying in {wait}s… (attempt {attempt + 1}/{retries - 1})")
+                print(_warn(f"  Appliku not ready yet — retrying in {wait}s… (attempt {attempt + 1}/{retries - 1})"))
                 _countdown("Waiting", wait)
             else:
                 raise
@@ -48,15 +70,66 @@ def _prompt(label: str, default: str | None = None) -> str:
     return value if value else (default or "")
 
 
-_TERMINAL_STATUSES = {"Deployed", "Failed", "Timeout", "Aborted"}
+_TERMINAL_STATUSES = {"Deployed", "Finished", "Failed", "Timeout", "Aborted"}
 _POLL_INTERVAL = 10
 _POLL_MAX_ATTEMPTS = 72  # 72 × 10s = 12 minutes
 
 
+_ERROR_KEYWORDS = ("error", "exception", "traceback", "keyerror", "improperlyconfigured",
+                   "fatal", "failed", "cannot", "could not", "no such")
+
+
+def _extract_failure_reason(log: str) -> list[str]:
+    """Return lines from the log that look like error messages."""
+    hits = []
+    for line in log.splitlines():
+        lower = line.lower()
+        if any(kw in lower for kw in _ERROR_KEYWORDS):
+            hits.append(line.strip())
+    return hits
+
+
+def _print_deployment_log(client: ApplikuClient, deployment_id: int, failed: bool = False) -> None:
+    """Fetch and print the full deployment log, indented and dimmed.
+
+    If failed=True, also extract and highlight the likely failure reason.
+    """
+    try:
+        deployment = client.get_deployment(deployment_id)
+    except ApplikuAPIError:
+        logger.debug("Could not fetch deployment detail for id=%s", deployment_id)
+        return
+
+    # Try known field names for the log text
+    log = ""
+    for field in ("log", "output", "build_log", "release_log", "deployment_log"):
+        log = deployment.get(field) or ""
+        if log:
+            break
+
+    if not log:
+        logger.debug("Deployment object fields: %s", list(deployment.keys()))
+        return
+
+    print(_info("\n── Deployment log ──────────────────────────────────"))
+    for line in log.splitlines():
+        print(_log(line))
+    print(_info("────────────────────────────────────────────────────\n"))
+
+    if failed:
+        reasons = _extract_failure_reason(log)
+        if reasons:
+            print(_err("── Likely failure reason ───────────────────────────"))
+            for line in reasons:
+                print(_err(f"  {line}"))
+            print(_err("────────────────────────────────────────────────────\n"))
+
+
 def _wait_for_deployment(client: ApplikuClient) -> bool:
     """Poll the latest deployment until it reaches a terminal status. Returns True on success."""
-    print("\nWaiting for deployment to complete…")
+    print(_info("\nWaiting for deployment to complete…"))
     last_status = None
+    last_deployment_id = None
     for attempt in range(_POLL_MAX_ATTEMPTS):
         try:
             deployment = client.get_latest_deployment()
@@ -65,22 +138,37 @@ def _wait_for_deployment(client: ApplikuClient) -> bool:
             continue
 
         status = deployment.get("status", "")
+        last_deployment_id = deployment.get("id")
         if status != last_status:
-            print(f"  Status: {status}")
+            print(_info(f"  Status: {status}"))
             last_status = status
 
         if status in _TERMINAL_STATUSES:
-            if status == "Deployed":
-                print("  ✓ Deployment succeeded.")
+            success = status in ("Deployed", "Finished")
+            if last_deployment_id:
+                _print_deployment_log(client, last_deployment_id, failed=not success)
+            if success:
+                print(_ok("  ✓ Deployment succeeded."))
                 return True
             else:
-                print(f"  ✗ Deployment ended with status: {status}")
+                print(_err(f"  ✗ Deployment ended with status: {status}"))
                 return False
 
         time.sleep(_POLL_INTERVAL)
 
-    print("  Timed out waiting for deployment.")
+    print(_err("  Timed out waiting for deployment."))
     return False
+
+
+def _get_domains(client: ApplikuClient) -> list[str]:
+    """Return all domains for the app: custom domains first, then the default subdomain."""
+    domains = client.list_domains()
+    if not domains:
+        app = client.get_app()
+        subdomain = app.get("default_subdomain", "")
+        if subdomain and not app.get("is_disabled_default_subdomain"):
+            domains = [subdomain]
+    return domains
 
 
 def _check_site(url: str) -> bool:
@@ -101,36 +189,36 @@ def _check_site_and_offer_redeploy(client: ApplikuClient, url: str) -> bool:
 
     Returns True if the site is confirmed working, False otherwise.
     """
-    print(f"\nChecking site at {url} …")
+    print(_info(f"\nChecking site at {url} …"))
     if _check_site(url):
-        print(f"  ✓ Site is up: {url}")
+        print(_ok(f"  ✓ Site is up: {url}"))
         return True
 
     print(
-        "  The site returned an error (often a transient nginx routing issue on first deploy).\n"
-        "  Would you like to trigger a second deployment to fix it? [Y/n] ",
+        _warn("  The site returned an error (often a transient nginx routing issue on first deploy).") + "\n"
+        + _warn("  Would you like to trigger a second deployment to fix it? [Y/n] "),
         end="",
     )
     answer = input().strip().lower()
     if answer in ("", "y", "yes"):
-        print("  Triggering redeploy…")
+        print(_info("  Triggering redeploy…"))
         client.trigger_deploy()
         deployed = _wait_for_deployment(client)
         if not deployed:
-            print(f"  Redeploy failed. Check the logs at https://app.appliku.com")
+            print(_err(f"  Redeploy failed. Check the logs at https://app.appliku.com"))
             return False
-        print(f"\nRe-checking {url} …")
+        print(_info(f"\nRe-checking {url} …"))
         if _check_site(url):
-            print(f"  ✓ Site is up: {url}")
+            print(_ok(f"  ✓ Site is up: {url}"))
             return True
         else:
-            print(
+            print(_err(
                 f"  Site still not responding at {url}\n"
                 "  Check the deployment logs at https://app.appliku.com"
-            )
+            ))
             return False
     else:
-        print(f"\nVisit {url} when ready.")
+        print(_info(f"\nVisit {url} when ready."))
         return False
 
 
@@ -145,13 +233,13 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     cwd = cwd or Path.cwd()
 
     if credentials.provisioned:
-        print(
+        print(_warn(
             "\nThis app has already been provisioned.\n"
             "To start fresh:\n"
             "  1. Delete the app at https://app.appliku.com\n"
             f"  2. Remove APPLIKU_APP_ID and APPLIKU_PROVISIONED from .env.appliku\n"
             "  3. Re-run appliku-setup"
-        )
+        ))
         return
 
     client = ApplikuClient(
@@ -179,7 +267,7 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
 
     step = 1
 
-    print(f"[{step}/2] Pushing config vars…")
+    print(_bold(f"[{step}/2] Pushing config vars…"))
     config_vars: dict[str, str] = {"SECRET_KEY": secrets.token_urlsafe(50)}
     superuser_password: str | None = None
     if superuser_email:
@@ -187,75 +275,72 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         config_vars["SUPERUSER_EMAIL"] = superuser_email
         config_vars["SUPERUSER_PASSWORD"] = superuser_password
     push_vars(config_vars)
-    print("      ✓ Done")
+    print(_ok("      ✓ Done"))
     step += 1
 
     if media_storage == "s3_compatible":
-        print(f"[{step}/2] Configuring S3-compatible storage…")
+        print(_bold(f"[{step}/2] Configuring S3-compatible storage…"))
         push_vars({
             "AWS_ACCESS_KEY_ID": _prompt("AWS_ACCESS_KEY_ID"),
             "AWS_SECRET_ACCESS_KEY": _prompt("AWS_SECRET_ACCESS_KEY"),
             "AWS_STORAGE_BUCKET_NAME": _prompt("AWS_STORAGE_BUCKET_NAME"),
             "AWS_S3_ENDPOINT_URL": _prompt("AWS_S3_ENDPOINT_URL"),
         })
-        print("      ✓ Done")
+        print(_ok("      ✓ Done"))
     if email_backend != "console":
-        print(f"[{step}/2] Configuring email ({email_backend})…")
+        print(_bold(f"[{step}/2] Configuring email ({email_backend})…"))
         push_vars({
             "EMAIL_HOST": _prompt("EMAIL_HOST"),
             "EMAIL_PORT": _prompt("EMAIL_PORT", default="587"),
             "EMAIL_HOST_USER": _prompt("EMAIL_HOST_USER"),
             "EMAIL_HOST_PASSWORD": _prompt("EMAIL_HOST_PASSWORD"),
         })
-        print("      ✓ Done")
+        print(_ok("      ✓ Done"))
     if use_sentry:
-        print(f"[{step}/2] Configuring Sentry…")
+        print(_bold(f"[{step}/2] Configuring Sentry…"))
         push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
-        print("      ✓ Done")
+        print(_ok("      ✓ Done"))
 
-    print(f"[2/2] Triggering first deployment…")
+    print(_bold("[2/2] Triggering first deployment…"))
     client.trigger_deploy()
 
     save_provisioned(cwd=cwd)
 
     if superuser_email and superuser_password:
-        print("\n" + "=" * 50)
-        print("  SUPERUSER CREDENTIALS")
-        print(f"  Email:    {superuser_email}")
-        print(f"  Password: {superuser_password}")
-        print("=" * 50)
-        print("  Save this password — it won't be shown again.")
-        print("  After your first deploy completes, remove")
-        print("  SUPERUSER_EMAIL and SUPERUSER_PASSWORD from")
-        print("  Appliku → App → Environment Variables.")
-        print("=" * 50 + "\n")
+        print("\n" + _bold("=" * 50))
+        print(_bold("  SUPERUSER CREDENTIALS"))
+        print(_bold(f"  Email:    {superuser_email}"))
+        print(_bold(f"  Password: {superuser_password}"))
+        print(_bold("=" * 50))
+        print(_warn("  Save this password — it won't be shown again."))
+        print(_bold("=" * 50) + "\n")
 
     deployed = _wait_for_deployment(client)
 
     if deployed:
-        domains = client.list_domains()
+        domains = _get_domains(client)
         if domains:
             url = f"https://{domains[0]}"
             site_up = _check_site_and_offer_redeploy(client, url)
         else:
             site_up = True  # can't verify but deployment succeeded
-            print("\nAppliku setup complete. No domain found to verify — check the dashboard.")
+            print(_warn("\nNo domain found after waiting — check the Appliku dashboard."))
 
         if site_up and superuser_email:
             print(
-                "\nWould you like to remove SUPERUSER_EMAIL and SUPERUSER_PASSWORD\n"
-                "from Appliku now that the superuser has been created? [Y/n] ",
+                _info("\nWould you like to remove SUPERUSER_EMAIL and SUPERUSER_PASSWORD\n"
+                "from Appliku now that the superuser has been created? [Y/n] "),
                 end="",
             )
             if input().strip().lower() in ("", "y", "yes"):
                 client.delete_config_vars(["SUPERUSER_EMAIL", "SUPERUSER_PASSWORD"])
-                print("  ✓ Superuser credentials removed from Appliku environment variables.")
+                print(_ok("  ✓ Superuser credentials removed from Appliku environment variables."))
     else:
-        print(
+        print(_err(
             "\nDeployment did not succeed. Check the build logs at:\n"
             "  https://app.appliku.com"
-        )
+        ))
         return
 
-    print("\nAppliku setup complete.")
-    print("Once you're ready, add a custom domain from the Appliku dashboard.")
+    print(_ok("\nAppliku setup complete."))
+    print(_info("Once you're ready, add a custom domain from the Appliku dashboard."))
