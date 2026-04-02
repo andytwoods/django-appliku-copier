@@ -21,7 +21,11 @@ elif User.objects.filter(is_superuser=True).exists():
     print('Superuser already exists — skipping.')
 else:
     password = os.environ.get('SUPERUSER_PASSWORD') or secrets.token_urlsafe(12)
-    User.objects.create_superuser(email=email, password=password)
+    kwargs = {'password': password}
+    kwargs[User.USERNAME_FIELD] = email if User.USERNAME_FIELD == 'email' else email.split('@')[0]
+    if 'email' not in kwargs and hasattr(User, 'email'):
+        kwargs['email'] = email
+    User.objects.create_superuser(**kwargs)
     print('=== SUPERUSER CREATED ===')
     print(f'Email: {email}')
     print(f'Password: {password}')
