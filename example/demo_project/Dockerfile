@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
@@ -9,8 +9,10 @@ RUN apt-get update \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock ./
-RUN UV_PROJECT_ENVIRONMENT=/usr/local uv sync --frozen --no-dev
+RUN UV_PROJECT_ENVIRONMENT=/usr/local uv sync --frozen --no-dev --extra production
 
 COPY . .
+
+RUN SECRET_KEY=build-only python manage.py collectstatic --noinput
 
 EXPOSE 8000

@@ -9,4 +9,21 @@ for i in $(seq 1 12); do
     sleep 10
 done
 
-python manage.py collectstatic --noinput
+echo "=== Creating superuser (if needed) ==="
+python manage.py shell -c "
+import os, secrets
+from django.contrib.auth import get_user_model
+User = get_user_model()
+email = os.environ.get('SUPERUSER_EMAIL', '')
+if not email:
+    print('SUPERUSER_EMAIL not set — skipping superuser creation.')
+elif User.objects.filter(is_superuser=True).exists():
+    print('Superuser already exists — skipping.')
+else:
+    password = os.environ.get('SUPERUSER_PASSWORD') or secrets.token_urlsafe(12)
+    User.objects.create_superuser(email=email, password=password)
+    print('=== SUPERUSER CREATED ===')
+    print(f'Email: {email}')
+    print(f'Password: {password}')
+    print('=========================')
+"
