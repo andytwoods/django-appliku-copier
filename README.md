@@ -287,7 +287,7 @@ all questions and regenerate the files in place:
 
 ```bash
 cd example/demo_project
-copier copy ../../template . --overwrite --trust
+copier copy ../.. . --overwrite --trust --vcs-ref HEAD
 ```
 
 This prompts for every question fresh and overwrites the generated files —
