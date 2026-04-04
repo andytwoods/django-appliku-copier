@@ -324,11 +324,15 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         print(_bold(f"[{step}/2] Configuring Sentry…"))
         push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
         print(_ok("      ✓ Done"))
+    _EXTRA_VAR_DEFAULTS: dict[str, str] = {
+        "DJANGO_ADMIN_URL": "myadmin/",
+    }
+
     if extra_env_vars:
         print(_bold(f"Additional required env vars detected in {settings_module}:"))
         extra_values = {}
         for var in extra_env_vars:
-            value = _prompt(f"  {var}")
+            value = _prompt(f"  {var}", default=_EXTRA_VAR_DEFAULTS.get(var))
             if value:
                 extra_values[var] = value
         if extra_values:
