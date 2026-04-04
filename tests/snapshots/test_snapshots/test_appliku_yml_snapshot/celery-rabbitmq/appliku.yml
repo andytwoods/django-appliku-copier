@@ -13,6 +13,8 @@ build_settings:
         property: connection_url
     - name: ALLOWED_HOSTS
       from_domains: true
+    - name: CSRF_TRUSTED_ORIGINS
+      source: manual
     - name: SECRET_KEY
       source: manual
     - name: WEB_CONCURRENCY

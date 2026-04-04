@@ -12,6 +12,11 @@ secret_key_var:
     help: "Environment variable name your settings use for SECRET_KEY (check your settings file)"
     default: "SECRET_KEY"
 
+build_settings_module:
+    type: str
+    help: "Settings module for Docker build-time collectstatic (must not require production env vars, e.g. myapp.settings.base)"
+    default: ""
+
 python_version:
     type: str
     help: "Python version for the Dockerfile base image (e.g. 3.14)"
