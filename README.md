@@ -49,22 +49,22 @@ copier copy gh:andytwoods/django-appliku-copier . --trust
 
 Copier asks a series of questions:
 
-| Question | Options | Default |
-|---|---|---|
-| Project name | any string | — |
-| Project slug | Python module name (e.g. `my_app`) | derived from name |
-| Python version | e.g. `3.13` | `3.13` |
-| Package manager | `uv`, `pip` | `uv` |
-| Web server | `gunicorn`, `uvicorn` | `gunicorn` |
+| Question | Options                                                                                           | Default |
+|---|---------------------------------------------------------------------------------------------------|---|
+| Project name | any string                                                                                        | — |
+| Project slug | Python module name (e.g. `my_app`)                                                                | derived from name |
+| Python version | e.g. `3.14`                                                                                       | `3.13` |
+| Package manager | `uv`, `pip`                                                                                       | `uv` |
+| Web server | `gunicorn`, `uvicorn`                                                                             | `gunicorn` |
 | Database | `postgresql_18/17/16/15`, `postgis_16_34`, `postgresql_16_pgvector`, `timescale_db_17`, `mysql_8` | `postgresql_18` |
-| Task runner | `none`, `celery`, `huey` | `none` |
-| Celery broker | `redis`, `rabbitmq` | `redis` *(if Celery)* |
-| Redis version | `8`, `7`, `6` | `8` *(if Redis needed)* |
-| Celery beat? | yes/no | `no` *(if Celery — Huey has a built-in scheduler)* |
-| Media storage | `none`, `s3_compatible`, `volume` | `none` |
-| Email backend | `console`, `smtp`, `sendgrid`, `mailgun`, `ses` | `console` |
-| Sentry? | yes/no | `no` |
-| Superuser email | email address (leave blank to skip) | *(blank)* |
+| Task runner | `none`, `celery`, `huey`                                                                          | `none` |
+| Celery broker | `redis`, `rabbitmq`                                                                               | `redis` *(if Celery)* |
+| Redis version | `8`, `7`, `6`                                                                                     | `8` *(if Redis needed)* |
+| Celery beat? | yes/no                                                                                            | `no` *(if Celery — Huey has a built-in scheduler)* |
+| Media storage | `none`, `s3_compatible`, `volume`                                                                 | `none` |
+| Email backend | `console`, `smtp`, `sendgrid`, `mailgun`, `ses`                                                   | `console` |
+| Sentry? | yes/no                                                                                            | `no` |
+| Superuser email | email address (leave blank to skip)                                                               | *(blank)* |
 
 After answering, commit the generated files before moving on:
 
