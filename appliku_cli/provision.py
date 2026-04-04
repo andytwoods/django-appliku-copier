@@ -256,6 +256,11 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         if deployed:
             domains = _get_domains(client)
             if domains:
+                allowed_hosts = ",".join(domains)
+                csrf_origins = ",".join(f"https://{d}" for d in domains)
+                _retry_on_500("Config vars", client.set_config_vars,
+                              {"ALLOWED_HOSTS": allowed_hosts, "CSRF_TRUSTED_ORIGINS": csrf_origins})
+                print(_ok(f"  ✓ ALLOWED_HOSTS set to: {allowed_hosts}"))
                 _check_site_and_offer_redeploy(client, f"https://{domains[0]}")
             print(_ok("\nDeployment complete."))
         else:
@@ -376,6 +381,10 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         save_provisioned(cwd=cwd)
         domains = _get_domains(client)
         if domains:
+            allowed_hosts = ",".join(domains)
+            csrf_origins = ",".join(f"https://{d}" for d in domains)
+            push_vars({"ALLOWED_HOSTS": allowed_hosts, "CSRF_TRUSTED_ORIGINS": csrf_origins})
+            print(_ok(f"  ✓ ALLOWED_HOSTS set to: {allowed_hosts}"))
             url = f"https://{domains[0]}"
             site_up = _check_site_and_offer_redeploy(client, url)
         else:
