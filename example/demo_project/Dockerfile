@@ -16,6 +16,6 @@ RUN if python3 -c "import sys,tomllib; d=tomllib.load(open('pyproject.toml','rb'
 
 COPY . .
 
-RUN SECRET_KEY=build-only python manage.py collectstatic --noinput
+RUN DJANGO_SECRET_KEY=build-only python manage.py collectstatic --noinput
 
 EXPOSE 8000

@@ -33,7 +33,10 @@
       "Bash(rm -rf /tmp/_copier_test)",
       "Bash(mkdir /tmp/_copier_test)",
       "Bash(.venv/bin/python:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git tag:*)"
     ]
   }
 }
