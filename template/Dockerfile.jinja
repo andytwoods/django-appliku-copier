@@ -21,6 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 {% endif %}
-RUN SECRET_KEY=build-only python manage.py collectstatic --noinput
+RUN {{ secret_key_var }}=build-only python manage.py collectstatic --noinput
 
 EXPOSE 8000

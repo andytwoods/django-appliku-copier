@@ -57,6 +57,12 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    print(
+        f"{Fore.YELLOW}Before continuing, make sure you have committed and pushed all "
+        f"changes to your remote repository — Appliku deploys from there.{Style.RESET_ALL}\n"
+    )
+    input("Press Enter to continue…")
+
     answers = _load_answers(args.copier_answers_file)
     credentials = load_credentials()
 
