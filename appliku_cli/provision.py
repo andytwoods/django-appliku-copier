@@ -342,8 +342,6 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     print(_bold("[2/2] Triggering first deployment…"))
     client.trigger_deploy()
 
-    save_provisioned(cwd=cwd)
-
     if superuser_email and superuser_password:
         print("\n" + _bold("=" * 50))
         print(_bold("  SUPERUSER CREDENTIALS"))
@@ -356,6 +354,7 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     deployed = _wait_for_deployment(client)
 
     if deployed:
+        save_provisioned(cwd=cwd)
         domains = _get_domains(client)
         if domains:
             url = f"https://{domains[0]}"
