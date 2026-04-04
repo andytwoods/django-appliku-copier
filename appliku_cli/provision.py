@@ -234,13 +234,32 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     cwd = cwd or Path.cwd()
 
     if credentials.provisioned:
-        print(_warn(
-            "\nThis app has already been provisioned.\n"
-            "To start fresh:\n"
-            "  1. Delete the app at https://app.appliku.com\n"
-            f"  2. Remove APPLIKU_APP_ID and APPLIKU_PROVISIONED from .env.appliku\n"
-            "  3. Re-run appliku-setup"
-        ))
+        print(_warn("\nThis app has already been provisioned."))
+        print(_warn("Would you like to trigger a new deployment anyway? [y/N] "), end="")
+        answer = input().strip().lower()
+        if answer not in ("y", "yes"):
+            print(_info(
+                "To start fresh:\n"
+                "  1. Delete the app at https://app.appliku.com\n"
+                f"  2. Remove APPLIKU_APP_ID and APPLIKU_PROVISIONED from .env.appliku\n"
+                "  3. Re-run appliku-setup"
+            ))
+            return
+        client = ApplikuClient(
+            api_key=credentials.api_key,
+            team_path=credentials.team_path,
+            app_id=credentials.app_id,
+        )
+        print(_bold("Triggering deployment…"))
+        client.trigger_deploy()
+        deployed = _wait_for_deployment(client)
+        if deployed:
+            domains = _get_domains(client)
+            if domains:
+                _check_site_and_offer_redeploy(client, f"https://{domains[0]}")
+            print(_ok("\nDeployment complete."))
+        else:
+            print(_err("\nDeployment did not succeed. Check the build logs at:\n  https://app.appliku.com"))
         return
 
     client = ApplikuClient(
