@@ -1,11 +1,13 @@
-# Changes here will be overwritten by Copier
-_src_path: /Users/andytwoods/PycharmProjects/DjangoAppliku/template
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v0.1.1-7-gaa41f95
+_src_path: ../..
 db_type: postgresql_18
 email_backend: console
 media_storage: none
 package_manager: uv
-project_slug: testapp1
-python_version: '3.13'
+project_slug: myapp
+python_version: '3.14'
+superuser_email: andytwoods@gmail.com
 task_runner: none
-use_sentry: 'false'
+use_sentry: false
 web_server: gunicorn

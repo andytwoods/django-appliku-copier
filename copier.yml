@@ -7,9 +7,14 @@ project_slug:
     type: str
     help: "Python module name used in wsgi/asgi paths (e.g. myapp)"
 
+secret_key_var:
+    type: str
+    help: "Environment variable name your settings use for SECRET_KEY (check your settings file)"
+    default: "SECRET_KEY"
+
 python_version:
     type: str
-    help: "Python version for the Dockerfile base image (e.g. 3.13)"
+    help: "Python version for the Dockerfile base image (e.g. 3.14)"
     default: "3.14"
 
 package_manager:

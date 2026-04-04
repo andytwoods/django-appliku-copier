@@ -9,6 +9,7 @@ from colorama import Fore, Style, init as colorama_init
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.credentials import Credentials, save_deployment_target, save_provisioned
+from appliku_cli.detect import detect_django_settings_module, detect_secret_key_var
 
 colorama_init(autoreset=True)
 
@@ -267,8 +268,17 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
 
     step = 1
 
+    secret_key_var = detect_secret_key_var(cwd)
+    settings_module = detect_django_settings_module(cwd)
+    if secret_key_var != "SECRET_KEY":
+        logger.info("Detected SECRET_KEY env var name: %s", secret_key_var)
+    if settings_module:
+        logger.info("Detected DJANGO_SETTINGS_MODULE: %s", settings_module)
+
     print(_bold(f"[{step}/2] Pushing config vars…"))
-    config_vars: dict[str, str] = {"SECRET_KEY": secrets.token_urlsafe(50)}
+    config_vars: dict[str, str] = {secret_key_var: secrets.token_urlsafe(50)}
+    if settings_module:
+        config_vars["DJANGO_SETTINGS_MODULE"] = settings_module
     superuser_password: str | None = None
     if superuser_email:
         superuser_password = secrets.token_urlsafe(12)

@@ -9,18 +9,10 @@ python -c "import django; django.setup()" || {
     exit 1
 }
 
-# Wait for the database to be reachable before running migrations.
-# On first deploy Appliku may still be starting the database container.
+
 echo "=== Running migrations ==="
-for i in $(seq 1 12); do
-    python manage.py migrate --noinput && break
-    if [ $i -eq 12 ]; then
-        echo "ERROR: Database still not reachable after 12 attempts. Giving up." >&2
-        exit 1
-    fi
-    echo "Database not ready yet, retrying in 10s… ($i/12)"
-    sleep 10
-done
+python manage.py migrate --noinput
+
 
 echo "=== Creating superuser (if needed) ==="
 python manage.py shell -c "

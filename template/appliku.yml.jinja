@@ -51,7 +51,7 @@ build_settings:
       from_domains: true
     - name: CSRF_TRUSTED_ORIGINS
       source: manual
-    - name: SECRET_KEY
+    - name: {{ secret_key_var }}
       source: manual
     - name: WEB_CONCURRENCY
       value: "2"

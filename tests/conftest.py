@@ -9,6 +9,7 @@ TEMPLATE_DIR = Path(__file__).resolve().parent.parent  # repo root; copier.yml +
 
 BASE_DATA: dict[str, Any] = {
     "project_slug": "test_project",
+    "secret_key_var": "SECRET_KEY",
     "python_version": "3.13",
     "package_manager": "uv",
     "web_server": "gunicorn",
