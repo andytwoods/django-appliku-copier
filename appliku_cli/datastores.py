@@ -49,6 +49,8 @@ def _short_type(store_type: str) -> str:
 _DATASTORE_CONTAINER_RE = re.compile(r"\b(\d+)-db\b")
 # Stock image names that indicate a database container
 _STOCK_DB_IMAGES = re.compile(r"\b(postgres|redis|mysql|rabbitmq):", re.IGNORECASE)
+# App containers follow the pattern "{appname}_{service}:{deployment_id}"
+_APP_CONTAINER_RE = re.compile(r"^([a-z0-9]+)_([a-z0-9_]+):\d+$")
 
 
 def _parse_docker_db_containers(docker_info: str) -> dict[int, str]:
@@ -73,6 +75,31 @@ def _parse_docker_db_containers(docker_info: str) -> dict[int, str]:
             # Use a sentinel negative ID so we know it's unnamed
             found[-(len(found) + 1)] = image
     return found
+
+
+def _parse_docker_app_containers(docker_info: str) -> list[dict]:
+    """Parse docker_info and return a list of running app containers.
+
+    Each entry: {container_id, image, app_name, service}
+    Only returns containers matching the Appliku app-image pattern
+    "{appname}_{service}:{deployment_id}".
+    """
+    containers = []
+    for line in docker_info.splitlines():
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        container_id = parts[0]
+        image = parts[1]
+        m = _APP_CONTAINER_RE.match(image)
+        if m:
+            containers.append({
+                "container_id": container_id,
+                "image":        image,
+                "app_name":     m.group(1),
+                "service":      m.group(2),
+            })
+    return containers
 
 
 def main() -> None:
@@ -136,14 +163,21 @@ def main() -> None:
                     "store_type": ds.get("store_type") or ds.get("type", ""),
                 }
 
-    # ── Get server docker info to find running DB containers ──────────────────
+    # ── Get server docker info to find running containers ────────────────────
     docker_running: dict[int, str] = {}
+    stray_app_containers: list[dict] = []
+    known_app_names = {app.get("name", "").lower() for app in apps}
+
     try:
         servers = client.list_servers()
         for srv in servers:
             docker_info = srv.get("docker_info", "")
-            if docker_info:
-                docker_running.update(_parse_docker_db_containers(docker_info))
+            if not docker_info:
+                continue
+            docker_running.update(_parse_docker_db_containers(docker_info))
+            for c in _parse_docker_app_containers(docker_info):
+                if c["app_name"].lower() not in known_app_names:
+                    stray_app_containers.append(c)
     except ApplikuAPIError:
         pass  # server info is best-effort
 
@@ -195,15 +229,33 @@ def main() -> None:
         for _, image in sorted(unnamed.items(), key=lambda kv: kv[1]):
             print(f"    {_dim(image)}")
 
+    # ── Stray app containers ──────────────────────────────────────────────────
+    if stray_app_containers:
+        print()
+        print(_bold("─" * 64))
+        print(_err("  STRAY APP CONTAINERS  (running on server, app no longer in Appliku)"))
+        print(_bold("─" * 64))
+        for c in stray_app_containers:
+            print(f"    {c['container_id'][:12]}  {c['image']}")
+        print()
+        print(_warn("  These cannot be removed via the API — the app is already deleted."))
+        print(_warn("  To remove them, SSH into your server and run:"))
+        for c in stray_app_containers:
+            cid = c["container_id"][:12]
+            print(f"    {_dim(f'docker rm -f {cid}')}")
+    else:
+        print()
+        print(_ok("  No stray app containers detected."))
+
     print()
     print(_bold("═" * 64))
     print(f"  Attached: {_ok(str(len(attached)))}   "
-          f"Stray: {_err(str(len(stray))) if stray else _ok('0')}   "
-          f"Running: {_ok(str(len([i for i in docker_running if i > 0])))}")
+          f"Stray DBs: {_err(str(len(stray))) if stray else _ok('0')}   "
+          f"Stray containers: {_err(str(len(stray_app_containers))) if stray_app_containers else _ok('0')}")
     print(_bold("═" * 64))
 
     # ── Remove stray ──────────────────────────────────────────────────────────
-    if args.remove_stray and not stray:
+    if args.remove_stray and not stray and not stray_app_containers:
         print(_info("\nNothing to remove."))
         return
 
