@@ -1,4 +1,5 @@
 """Auto-detection of Django project settings for Appliku provisioning."""
+import ast
 import re
 from pathlib import Path
 
@@ -97,3 +98,78 @@ def detect_django_settings_module(cwd: Path) -> str | None:
             return f"{current_module}.production"
 
     return current_module
+
+
+def _module_to_path(cwd: Path, module: str) -> Path | None:
+    """Convert a dotted module name to a filesystem path."""
+    candidate = cwd / f"{module.replace('.', '/')}.py"
+    return candidate if candidate.exists() else None
+
+
+def detect_required_env_vars(cwd: Path, settings_module: str, skip_vars: set[str]) -> list[str]:
+    """Parse a settings file and return env var names that have no default.
+
+    Detects django-environ/decouple style calls:
+      env("VAR")              → required
+      env("VAR", default=...) → optional, skipped
+      env.bool("VAR")         → required
+      os.environ["VAR"]       → required
+
+    skip_vars: set of var names already handled by the template (DATABASE_URL etc.)
+    Returns a deduplicated list in order of appearance.
+    """
+    path = _module_to_path(cwd, settings_module)
+    if not path:
+        return []
+
+    try:
+        tree = ast.parse(path.read_text(errors="replace"))
+    except (SyntaxError, OSError):
+        return []
+
+    required: list[str] = []
+    seen: set[str] = set(skip_vars)
+
+    for node in ast.walk(tree):
+        var_name: str | None = None
+        is_required = False
+
+        # env("VAR") / env.type("VAR") / config("VAR")
+        if isinstance(node, ast.Call):
+            func = node.func
+            is_env_call = (
+                (isinstance(func, ast.Name) and func.id in ("env", "config"))
+                or (
+                    isinstance(func, ast.Attribute)
+                    and isinstance(func.value, ast.Name)
+                    and func.value.id in ("env", "config")
+                )
+            )
+            if is_env_call and node.args:
+                first = node.args[0]
+                if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                    var_name = first.value
+                    has_default = (
+                        any(kw.arg == "default" for kw in node.keywords)
+                        or len(node.args) > 1
+                    )
+                    is_required = not has_default
+
+        # os.environ["VAR"]
+        elif isinstance(node, ast.Subscript):
+            if (
+                isinstance(node.value, ast.Attribute)
+                and node.value.attr == "environ"
+                and isinstance(node.value.value, ast.Name)
+                and node.value.value.id == "os"
+            ):
+                key = node.slice
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    var_name = key.value
+                    is_required = True
+
+        if is_required and var_name and var_name not in seen:
+            required.append(var_name)
+            seen.add(var_name)
+
+    return required

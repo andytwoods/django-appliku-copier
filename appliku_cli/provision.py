@@ -9,7 +9,7 @@ from colorama import Fore, Style, init as colorama_init
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.credentials import Credentials, save_deployment_target, save_provisioned
-from appliku_cli.detect import detect_django_settings_module, detect_secret_key_var
+from appliku_cli.detect import detect_django_settings_module, detect_required_env_vars, detect_secret_key_var
 
 colorama_init(autoreset=True)
 
@@ -263,6 +263,15 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         cluster_id, server_id = _pick_deployment_target(client)
         save_deployment_target(server_id=server_id, cluster_id=cluster_id, cwd=cwd)
 
+    # Vars already handled by the template or other provision steps — never prompt again
+    _HANDLED_VARS = {
+        "DATABASE_URL", "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS", "WEB_CONCURRENCY",
+        "CELERY_BROKER_URL", "REDIS_URL", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
+        "AWS_STORAGE_BUCKET_NAME", "AWS_S3_ENDPOINT_URL", "EMAIL_HOST", "EMAIL_PORT",
+        "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD", "SENTRY_DSN", "DJANGO_SETTINGS_MODULE",
+        "SUPERUSER_EMAIL", "SUPERUSER_PASSWORD", "MEDIA_ROOT",
+    }
+
     def push_vars(vars: dict) -> None:
         _retry_on_500("Config vars", client.set_config_vars, vars)
 
@@ -274,6 +283,11 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         logger.info("Detected SECRET_KEY env var name: %s", secret_key_var)
     if settings_module:
         logger.info("Detected DJANGO_SETTINGS_MODULE: %s", settings_module)
+
+    skip_vars = _HANDLED_VARS | {secret_key_var}
+    extra_env_vars = detect_required_env_vars(cwd, settings_module, skip_vars) if settings_module else []
+    if extra_env_vars:
+        logger.info("Detected %d additional required env var(s): %s", len(extra_env_vars), ", ".join(extra_env_vars))
 
     print(_bold(f"[{step}/2] Pushing config vars…"))
     config_vars: dict[str, str] = {secret_key_var: secrets.token_urlsafe(50)}
@@ -309,6 +323,16 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     if use_sentry:
         print(_bold(f"[{step}/2] Configuring Sentry…"))
         push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
+        print(_ok("      ✓ Done"))
+    if extra_env_vars:
+        print(_bold(f"Additional required env vars detected in {settings_module}:"))
+        extra_values = {}
+        for var in extra_env_vars:
+            value = _prompt(f"  {var}")
+            if value:
+                extra_values[var] = value
+        if extra_values:
+            push_vars(extra_values)
         print(_ok("      ✓ Done"))
 
     print(_bold("[2/2] Triggering first deployment…"))
