@@ -129,6 +129,46 @@ Redeploy once the port is free.
 
 ---
 
+## Datastore audit
+
+`appliku-datastores` lists every Postgres/Redis/MySQL datastore across all your
+apps in one view, shows whether each is currently running, and flags any
+containers on the server that are no longer attached to an app.
+
+```bash
+uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-datastores
+```
+
+Example output:
+
+```
+  costar_tools
+    [ 4263]  postgres      db                    running
+    [ 4262]  redis         cache                 running
+
+  iceplunge
+    [ 4088]  postgres      postgres              running
+    [ 4069]  redis         redis                 running
+
+  ════════════════════════════════════════════════════════════════
+  Attached: 14   Stray: 0   Running: 14
+```
+
+### Removing stray datastores
+
+If an app was deleted but its database containers were left running on the
+server, they appear in the **STRAY** section. Remove them interactively:
+
+```bash
+uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-datastores --remove-stray
+```
+
+You will be shown exactly what will be deleted and asked to type `yes` before
+anything is removed. If the owning app is already gone from the API, the tool
+prints the equivalent `docker rm -f` command instead.
+
+---
+
 ## Django project requirements
 
 The template does not touch your Django source files. You need these in place

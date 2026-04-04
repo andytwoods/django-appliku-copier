@@ -12,6 +12,7 @@ dependencies = [
 
 [project.scripts]
 appliku-setup = "appliku_cli.cli:main"
+appliku-datastores = "appliku_cli.datastores:main"
 
 [dependency-groups]
 dev = [

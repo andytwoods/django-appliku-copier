@@ -51,7 +51,22 @@ class ApplikuClient:
         url = f"{BASE_URL}/api/team"
         return self._check(self._session.get(url))
 
-    # ── Team-level (no app_id needed) ─────────────────────────────────────────
+    def list_apps(self) -> list[dict]:
+        """GET /api/team/{team_path}/applications/list/ — returns all apps."""
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/list/"
+        result = self._check(self._session.get(url))
+        return result if isinstance(result, list) else result.get("results", [])
+
+    def delete_datastore(self, app_id: int, datastore_id: int) -> None:
+        """DELETE /api/team/{team_path}/applications/{app_id}/datastores/{id}"""
+        team_path = self._require_team_path()
+        logger.info("Deleting datastore app_id=%s datastore_id=%s", app_id, datastore_id)
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/datastores/{datastore_id}"
+        self._check(self._session.delete(url))
+
+    def list_servers(self) -> list[dict]:
+        """GET /api/team/{team_path}/server_list"""
 
     def list_clusters(self) -> list[dict]:
         """GET /api/team/{team_path}/clusters"""
