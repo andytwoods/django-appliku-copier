@@ -1,7 +1,45 @@
 # Django Appliku
 
+> **Alpha stage** — things may break and APIs may change. Feedback and contributions are very much appreciated — please [open an issue](https://github.com/andytwoods/django-appliku-copier/issues) if something doesn't work.
+
 Adds Appliku deployment files to an existing Django project, then provisions
 everything on the platform for you.
+
+---
+
+## Quick start
+
+**1. Install uv** (if you don't have it):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**2. Install Copier:**
+
+```bash
+uv tool install copier
+```
+
+**3. Generate deployment files** (run from inside your Django project):
+
+```bash
+copier copy gh:andytwoods/django-appliku-copier . --trust
+```
+
+Answer the questions, then commit the generated files:
+
+```bash
+git add .
+git commit -m "Add Appliku deployment files"
+git push
+```
+
+**4. Provision and deploy on Appliku:**
+
+```bash
+uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-setup
+```
 
 ---
 
