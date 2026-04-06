@@ -11,6 +11,8 @@ BASE_DATA: dict[str, Any] = {
     "project_slug": "test_project",
     "secret_key_var": "SECRET_KEY",
     "build_settings_module": "",
+    "use_whitenoise_manifest": False,
+    "collectstatic_extra_env": "",
     "python_version": "3.13",
     "package_manager": "uv",
     "web_server": "gunicorn",

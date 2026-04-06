@@ -21,6 +21,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 {% endif %}
+{% if use_whitenoise_manifest %}
+RUN {{ secret_key_var }}=build-only DJANGO_SETTINGS_MODULE={{ build_settings_module or "config.settings.production" }}{% for pair in collectstatic_extra_env.split() %} {{ pair }}{% endfor %} python manage.py collectstatic --noinput
+{% else %}
 RUN {{ secret_key_var }}=build-only{% if build_settings_module %} DJANGO_SETTINGS_MODULE={{ build_settings_module }}{% endif %} python manage.py collectstatic --noinput
+{% endif %}
 
 EXPOSE 8000
