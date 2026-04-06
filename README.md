@@ -95,23 +95,24 @@ copier copy gh:andytwoods/django-appliku-copier . --trust
 
 Copier asks a series of questions:
 
-| Question | Options                                                                                           | Default |
-|---|---------------------------------------------------------------------------------------------------|---|
-| Project name | any string                                                                                        | — |
-| Project slug | Python module name (e.g. `my_app`)                                                                | derived from name |
-| Python version | e.g. `3.14`                                                                                       | `3.13` |
-| Package manager | `uv`, `pip`                                                                                       | `uv` |
-| Web server | `gunicorn`, `uvicorn`                                                                             | `gunicorn` |
+| Question | Options | Default |
+|---|---|---|
+| Project slug | Python module name (e.g. `my_app`) | — |
+| Secret key env var | env var name your settings use for `SECRET_KEY` | `SECRET_KEY` |
+| Production settings module | dotted module path used for `collectstatic` (e.g. `config.settings.production`) | `config.settings.production` |
+| Python version | e.g. `3.14` | `3.14` |
+| Package manager | `uv`, `pip` | `uv` |
+| Web server | `gunicorn`, `uvicorn` | `gunicorn` |
 | Database | `postgresql_18/17/16/15`, `postgis_16_34`, `postgresql_16_pgvector`, `timescale_db_17`, `mysql_8` | `postgresql_18` |
-| Task runner | `none`, `celery`, `huey`                                                                          | `none` |
-| Celery broker | `redis`, `rabbitmq`                                                                               | `redis` *(if Celery)* |
-| Redis version | `8`, `7`, `6`                                                                                     | `8` *(if Redis needed)* |
-| Celery beat? | yes/no                                                                                            | `no` *(if Celery — Huey has a built-in scheduler)* |
-| Media storage | `none`, `s3_compatible`, `volume`                                                                 | `none` |
-| Email backend | `console`, `smtp`, `sendgrid`, `mailgun`, `ses`                                                   | `console` |
-| Sentry? | yes/no                                                                                            | `no` |
-| Whitenoise manifest? | yes/no — uses production settings for `collectstatic` so the manifest is generated at build time; required dummy env vars are detected automatically | `no` |
-| Superuser email | email address (leave blank to skip)                                                               | *(blank)* |
+| Task runner | `none`, `celery`, `huey` | `none` |
+| Celery broker | `redis`, `rabbitmq` | `redis` *(if Celery)* |
+| Redis version | `8`, `7`, `6` | `8` *(if Redis needed)* |
+| Celery beat? | yes/no | `no` *(if Celery — Huey has a built-in scheduler)* |
+| Media storage | `none`, `s3_compatible`, `volume` | `none` |
+| Email backend | `console`, `smtp`, `sendgrid`, `mailgun`, `ses` | `console` |
+| Sentry? | yes/no | `no` |
+| Whitenoise manifest? | yes/no — runs `collectstatic` with production settings so the manifest is generated at build time; required dummy env vars are detected automatically | `no` |
+| Superuser email | email address (leave blank to skip) | *(blank)* |
 
 After answering, commit the generated files before moving on:
 
@@ -141,17 +142,17 @@ On first run it will:
      lets you pick a cluster, creates the app
    - **Existing app**: enter the app ID from your Appliku dashboard URL
 4. Provision your database, Redis, RabbitMQ, or media volume as configured
-5. Generate a `SECRET_KEY`, push all config vars to Appliku
+5. Detect your `SECRET_KEY` env var name and push all config vars to Appliku
 6. If you provided a superuser email: generate a random password, push
    `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD` to Appliku, and **print the
    credentials to your terminal** — save them, they won't be shown again.
    The first deploy will create the superuser automatically via `release.sh`.
-   After the deploy completes, remove `SUPERUSER_EMAIL` and `SUPERUSER_PASSWORD`
-   from **Appliku → App → Environment Variables**.
-7. Trigger the first deployment
+   After a successful deploy, `appliku-setup` offers to remove these vars for you.
+7. Push `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` from the app's discovered domain
+8. Trigger the first deployment and wait for it to complete
 
-Re-running `appliku-setup` is safe — it reads `.env.appliku` and skips
-anything already configured.
+Re-running `appliku-setup` is safe — if already provisioned it will offer to
+trigger a new deployment instead.
 
 ### Troubleshooting first deploy
 
