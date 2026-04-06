@@ -45,6 +45,8 @@ git push
 uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-setup
 ```
 
+On first run you will be asked for your **Appliku API key** — find it at **Appliku → Account → API Keys**. It is saved automatically to `.env.appliku` in your project root (gitignored) so you are never asked again.
+
 ![appliku-setup demo](readme_static/appliku-setup.gif)
 
 > The recording above shows redeploying an existing app. For a new app there are several additional steps: creating the app, provisioning datastores, pushing config vars, and triggering the first deploy.
