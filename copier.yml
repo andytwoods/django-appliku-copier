@@ -19,14 +19,8 @@ build_settings_module:
 
 use_whitenoise_manifest:
     type: bool
-    help: "Does your project use whitenoise CompressedManifestStaticFilesStorage (or Django ManifestStaticFilesStorage)? If yes, collectstatic will run with your production settings so the manifest is generated at build time."
+    help: "Does your project use whitenoise CompressedManifestStaticFilesStorage (or Django ManifestStaticFilesStorage)?"
     default: false
-
-collectstatic_extra_env:
-    type: str
-    help: "Space-separated KEY=value dummy env vars needed by production settings at collectstatic time (e.g. DJANGO_ADMIN_URL=build). Only needed when use_whitenoise_manifest is true."
-    default: ""
-    when: "{{ use_whitenoise_manifest }}"
 
 python_version:
     type: str
@@ -143,3 +137,5 @@ superuser_email:
 
 _tasks:
     - "python -c \"import pathlib; files=[pathlib.Path('worker.sh'),pathlib.Path('celery-beat.sh')]; [f.unlink() for f in files if f.exists() and not f.read_text().strip()]\""
+    - command: "python _patch_whitenoise_collectstatic.py"
+      when: "{{ use_whitenoise_manifest }}"

@@ -64,8 +64,7 @@ Copier asks a series of questions:
 | Media storage | `none`, `s3_compatible`, `volume`                                                                 | `none` |
 | Email backend | `console`, `smtp`, `sendgrid`, `mailgun`, `ses`                                                   | `console` |
 | Sentry? | yes/no                                                                                            | `no` |
-| Whitenoise manifest? | yes/no — uses production settings for `collectstatic` so the static manifest is generated at build time | `no` |
-| Collectstatic extra env | space-separated `KEY=value` dummy vars needed by production settings at build time (e.g. `DJANGO_ADMIN_URL=build`) | *(blank)* |
+| Whitenoise manifest? | yes/no — uses production settings for `collectstatic` so the manifest is generated at build time; required dummy env vars are detected automatically | `no` |
 | Superuser email | email address (leave blank to skip)                                                               | *(blank)* |
 
 After answering, commit the generated files before moving on:
