@@ -10,13 +10,18 @@ from pathlib import Path
 #   SECRET_KEY = env.str('MY_SECRET_KEY')
 #   SECRET_KEY = config('MY_SECRET_KEY')
 #   SECRET_KEY = os.getenv('MY_SECRET_KEY')
-_SECRET_KEY_RE = re.compile(
-    r"SECRET_KEY\s*=.*?"
-    r"(?:"
-    r"(?:getenv|get|env(?:\.str)?|config)\s*\(\s*['\"]([A-Z][A-Z0-9_]*)['\"]"
-    r"|environ\s*\[\s*['\"]([A-Z][A-Z0-9_]*)['\"]"
-    r")"
-)
+def _env_var_name_re(django_setting: str) -> re.Pattern:
+    """Return a regex that extracts the env var name used for a Django setting."""
+    return re.compile(
+        rf"{django_setting}\s*=.*?"
+        r"(?:"
+        r"(?:getenv|get|env(?:\.\w+)?|config)\s*\(\s*['\"]([A-Z][A-Z0-9_]*)['\"]"
+        r"|environ\s*\[\s*['\"]([A-Z][A-Z0-9_]*)['\"]"
+        r")"
+    )
+
+_SECRET_KEY_RE = _env_var_name_re("SECRET_KEY")
+_ALLOWED_HOSTS_RE = _env_var_name_re("ALLOWED_HOSTS")
 
 _SETTINGS_MODULE_RE = re.compile(
     r"""setdefault\s*\(\s*['"]DJANGO_SETTINGS_MODULE['"]\s*,\s*['"]([^'"]+)['"]"""
@@ -39,23 +44,30 @@ def _candidate_settings_files(cwd: Path) -> list[Path]:
     return results
 
 
-def detect_secret_key_var(cwd: Path) -> str:
-    """Scan Django settings to find the env var name used for SECRET_KEY.
-
-    Returns 'SECRET_KEY' if nothing more specific is found.
-    """
+def _detect_setting_var(cwd: Path, pattern: re.Pattern, default: str) -> str:
+    """Scan Django settings files for an env var name matching pattern."""
     for settings_file in _candidate_settings_files(cwd):
         try:
             content = settings_file.read_text(errors="replace")
         except OSError:
             continue
         for line in content.splitlines():
-            m = _SECRET_KEY_RE.search(line)
+            m = pattern.search(line)
             if m:
                 var = m.group(1) or m.group(2)
                 if var:
                     return var
-    return "SECRET_KEY"
+    return default
+
+
+def detect_secret_key_var(cwd: Path) -> str:
+    """Scan Django settings to find the env var name used for SECRET_KEY."""
+    return _detect_setting_var(cwd, _SECRET_KEY_RE, "SECRET_KEY")
+
+
+def detect_allowed_hosts_var(cwd: Path) -> str:
+    """Scan Django settings to find the env var name used for ALLOWED_HOSTS."""
+    return _detect_setting_var(cwd, _ALLOWED_HOSTS_RE, "ALLOWED_HOSTS")
 
 
 def detect_django_settings_module(cwd: Path) -> str | None:

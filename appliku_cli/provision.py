@@ -9,7 +9,7 @@ from colorama import Fore, Style, init as colorama_init
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.credentials import Credentials, save_deployment_target, save_provisioned
-from appliku_cli.detect import detect_django_settings_module, detect_required_env_vars, detect_secret_key_var
+from appliku_cli.detect import detect_allowed_hosts_var, detect_django_settings_module, detect_required_env_vars, detect_secret_key_var
 
 colorama_init(autoreset=True)
 
@@ -250,13 +250,14 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
             team_path=credentials.team_path,
             app_id=credentials.app_id,
         )
+        _allowed_hosts_var = detect_allowed_hosts_var(cwd)
         domains = _get_domains(client)
         if domains:
             allowed_hosts = ",".join(domains)
             csrf_origins = ",".join(f"https://{d}" for d in domains)
             _retry_on_500("Config vars", client.set_config_vars,
-                          {"ALLOWED_HOSTS": allowed_hosts, "CSRF_TRUSTED_ORIGINS": csrf_origins})
-            print(_ok(f"  ✓ ALLOWED_HOSTS set to: {allowed_hosts}"))
+                          {_allowed_hosts_var: allowed_hosts, "CSRF_TRUSTED_ORIGINS": csrf_origins})
+            print(_ok(f"  ✓ {_allowed_hosts_var} set to: {allowed_hosts}"))
         print(_bold("Triggering deployment…"))
         client.trigger_deploy()
         deployed = _wait_for_deployment(client)
@@ -303,13 +304,16 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     step = 1
 
     secret_key_var = detect_secret_key_var(cwd)
+    allowed_hosts_var = detect_allowed_hosts_var(cwd)
     settings_module = detect_django_settings_module(cwd)
     if secret_key_var != "SECRET_KEY":
         logger.info("Detected SECRET_KEY env var name: %s", secret_key_var)
+    if allowed_hosts_var != "ALLOWED_HOSTS":
+        logger.info("Detected ALLOWED_HOSTS env var name: %s", allowed_hosts_var)
     if settings_module:
         logger.info("Detected DJANGO_SETTINGS_MODULE: %s", settings_module)
 
-    skip_vars = _HANDLED_VARS | {secret_key_var}
+    skip_vars = _HANDLED_VARS | {secret_key_var, allowed_hosts_var, "DJANGO_ALLOWED_HOSTS"}
     extra_env_vars = detect_required_env_vars(cwd, settings_module, skip_vars) if settings_module else []
     if extra_env_vars:
         logger.info("Detected %d additional required env var(s): %s", len(extra_env_vars), ", ".join(extra_env_vars))
@@ -368,10 +372,10 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     pre_domains = _get_domains(client)
     if pre_domains:
         push_vars({
-            "ALLOWED_HOSTS": ",".join(pre_domains),
+            allowed_hosts_var: ",".join(pre_domains),
             "CSRF_TRUSTED_ORIGINS": ",".join(f"https://{d}" for d in pre_domains),
         })
-        print(_ok(f"      ✓ ALLOWED_HOSTS set to: {','.join(pre_domains)}"))
+        print(_ok(f"      ✓ {allowed_hosts_var} set to: {','.join(pre_domains)}"))
     client.trigger_deploy()
 
     if superuser_email and superuser_password:
