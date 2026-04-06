@@ -27,6 +27,8 @@ uv tool install copier
 copier copy gh:andytwoods/django-appliku-copier . --trust
 ```
 
+![copier demo](readme_static/copier.gif)
+
 Answer the questions, then commit the generated files:
 
 ```bash
@@ -40,6 +42,10 @@ git push
 ```bash
 uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-setup
 ```
+
+![appliku-setup demo](readme_static/appliku-setup.gif)
+
+> The recording above shows redeploying an existing app. For a new app there are several additional steps: creating the app, provisioning datastores, pushing config vars, and triggering the first deploy.
 
 ---
 
