@@ -47,8 +47,8 @@ build_settings:
     - name: SENTRY_DSN
       source: manual
 {%- endif %}
-    - name: ALLOWED_HOSTS
-      from_domains: true
+    - name: {{ allowed_hosts_var }}
+      source: manual
     - name: CSRF_TRUSTED_ORIGINS
       source: manual
     - name: {{ secret_key_var }}

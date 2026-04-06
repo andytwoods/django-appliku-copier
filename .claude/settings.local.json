@@ -36,7 +36,10 @@
       "Bash(python3:*)",
       "Bash(git add:*)",
       "Bash(git commit -m ':*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(curl -s -H \"Authorization: Token df6b89f573567aa79531bbe2289dc443f1c90868\" https://api.appliku.com/api/team)",
+      "Bash(curl -s -H \"Authorization: Token df6b89f573567aa79531bbe2289dc443f1c90868\" \"https://api.appliku.com/api/team/$\\(curl -s -H \"Authorization: Token df6b89f573567aa79531bbe2289dc443f1c90868\" https://api.appliku.com/api/team)",
+      "Bash(curl -s \"https://api.appliku.com/api/schema/\")"
     ]
   }
 }
