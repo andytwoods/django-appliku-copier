@@ -10,7 +10,7 @@ TEMPLATE_DIR = Path(__file__).resolve().parent.parent  # repo root; copier.yml +
 BASE_DATA: dict[str, Any] = {
     "project_slug": "test_project",
     "secret_key_var": "SECRET_KEY",
-    "build_settings_module": "",
+    "production_settings_module": "test_project.settings.production",
     "use_whitenoise_manifest": False,
     "python_version": "3.13",
     "package_manager": "uv",

@@ -12,10 +12,10 @@ secret_key_var:
     help: "Environment variable name your settings use for SECRET_KEY (check your settings file)"
     default: "SECRET_KEY"
 
-build_settings_module:
+production_settings_module:
     type: str
-    help: "Settings module for Docker build-time collectstatic (must not require production env vars, e.g. myapp.settings.base)"
-    default: ""
+    help: "{% if use_whitenoise_manifest %}Production settings module for collectstatic — whitenoise manifest requires it. Required env vars are set to dummy values automatically.{% else %}Settings module for Docker build-time collectstatic. Leave blank to use Django defaults.{% endif %}"
+    default: "{{ project_slug }}.settings.production"
 
 use_whitenoise_manifest:
     type: bool
