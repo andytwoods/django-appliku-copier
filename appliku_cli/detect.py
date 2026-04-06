@@ -185,3 +185,31 @@ def detect_required_env_vars(cwd: Path, settings_module: str, skip_vars: set[str
             seen.add(var_name)
 
     return required
+
+
+_WHITENOISE_MANIFEST_RE = re.compile(
+    r"CompressedManifestStaticFilesStorage|ManifestStaticFilesStorage",
+)
+
+
+def detect_whitenoise_manifest(cwd: Path) -> bool:
+    """Return True if any settings file uses whitenoise/Django manifest static storage."""
+    for settings_file in _candidate_settings_files(cwd):
+        try:
+            content = settings_file.read_text(errors="replace")
+        except OSError:
+            continue
+        if _WHITENOISE_MANIFEST_RE.search(content):
+            return True
+    return False
+
+
+def detect_build_dummy_env(cwd: Path, settings_module: str, always_skip: set[str]) -> dict[str, str]:
+    """Return {VAR: "build-dummy"} for every required env var in settings_module.
+
+    Used to build the collectstatic RUN command when production settings are needed
+    at build time (e.g. whitenoise manifest storage).
+    `always_skip` should include vars already set explicitly (e.g. SECRET_KEY, DATABASE_URL).
+    """
+    required = detect_required_env_vars(cwd, settings_module, always_skip)
+    return {var: "build-dummy" for var in required}
