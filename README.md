@@ -451,3 +451,5 @@ MIT — see [LICENSE](LICENSE).
 ## Attribution
 
 Some template files were adapted from [SpeedPy](https://github.com/speedpy/speedpy).
+
+Hero image is cropped and adapted from ["Minifig at computer"](https://www.flickr.com/photos/82379639@N00/82064577) by [legozilla](https://www.flickr.com/photos/legozilla/), used under [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/).
