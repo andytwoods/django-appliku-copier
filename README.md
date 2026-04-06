@@ -1,3 +1,5 @@
+![Django Appliku Copier](readme_static/django_appliku_copier.jpg)
+
 # Django Appliku
 
 > **Alpha stage** — things may break and APIs may change. Feedback and contributions are very much appreciated — please [open an issue](https://github.com/andytwoods/django-appliku-copier/issues) if something doesn't work.
