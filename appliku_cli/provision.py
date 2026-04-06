@@ -182,6 +182,75 @@ def _check_site(url: str) -> bool:
         return False
 
 
+def _strip_html(html: str) -> str:
+    """Strip HTML tags from ansi2html output returned by log endpoints."""
+    import re
+    text = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.DOTALL)
+    text = re.sub(r"<[^>]+>", "", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _fetch_async_logs(fetch_fn, poll_interval: int = 2, max_attempts: int = 10) -> str | None:
+    """Call fetch_fn() repeatedly until it returns a non-None value."""
+    for _ in range(max_attempts):
+        result = fetch_fn()
+        if result is not None:
+            return result
+        time.sleep(poll_interval)
+    return None
+
+
+def _show_log_menu(client: ApplikuClient, app_id: int, domain: str | None, deployment_id: int | None) -> None:
+    """Repeatedly show a log-type menu until the user chooses to exit."""
+    while True:
+        print()
+        print(_bold("  What would you like to see?"))
+        print("    [1] App log (last 100 lines)")
+        print("    [2] Deploy log (last 100 lines)")
+        if domain:
+            print("    [3] Nginx log (last 100 lines)")
+        print("    [x] Exit")
+        choice = input(_info("  Choice: ")).strip().lower()
+
+        if choice == "x":
+            break
+        elif choice == "1":
+            print(_info("  Fetching app logs…"))
+            try:
+                req_id = client.request_app_logs(app_id, process="web", tail=100)
+                raw = _fetch_async_logs(lambda: client.retrieve_app_logs(app_id, req_id))
+                if raw:
+                    print(_info("\n── App log ──────────────────────────────────────"))
+                    for line in _strip_html(raw).splitlines():
+                        print(_log(line))
+                    print(_info("─────────────────────────────────────────────────\n"))
+                else:
+                    print(_warn("  No app log available yet."))
+            except (ApplikuAPIError, KeyError) as e:
+                print(_err(f"  Could not fetch app log: {e}"))
+        elif choice == "2":
+            if deployment_id:
+                _print_deployment_log(client, deployment_id, failed=False)
+            else:
+                print(_warn("  No deployment ID available."))
+        elif choice == "3" and domain:
+            print(_info("  Fetching nginx logs…"))
+            try:
+                req_id = client.request_nginx_logs(app_id, domain=domain, tail=100)
+                raw = _fetch_async_logs(lambda: client.retrieve_nginx_logs(app_id, req_id))
+                if raw:
+                    print(_info("\n── Nginx log ────────────────────────────────────"))
+                    for line in _strip_html(raw).splitlines():
+                        print(_log(line))
+                    print(_info("─────────────────────────────────────────────────\n"))
+                else:
+                    print(_warn("  No nginx log available yet."))
+            except (ApplikuAPIError, KeyError) as e:
+                print(_err(f"  Could not fetch nginx log: {e}"))
+        else:
+            print(_warn("  Invalid choice."))
+
+
 def _check_site_and_offer_redeploy(client: ApplikuClient, url: str) -> bool:
     """Check the site URL; if it fails, offer to redeploy once and recheck.
 
@@ -211,15 +280,14 @@ def _check_site_and_offer_redeploy(client: ApplikuClient, url: str) -> bool:
             return True
         else:
             print(_err(f"  Site still not responding at {url}"))
-            print(_warn("  Would you like to see the last 100 lines of the deployment log? [Y/n] "), end="")
-            if input().strip().lower() in ("", "y", "yes"):
-                try:
-                    deployment = client.get_latest_deployment()
-                    dep_id = deployment.get("id")
-                    if dep_id:
-                        _print_deployment_log(client, dep_id, failed=True)
-                except ApplikuAPIError:
-                    print(_err("  Could not fetch deployment logs."))
+            try:
+                deployment = client.get_latest_deployment()
+                dep_id = deployment.get("id")
+            except ApplikuAPIError:
+                dep_id = None
+            from urllib.parse import urlparse
+            domain = urlparse(url).hostname
+            _show_log_menu(client, client._app_id, domain, dep_id)
             return False
     else:
         print(_info(f"\nVisit {url} when ready."))

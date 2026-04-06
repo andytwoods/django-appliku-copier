@@ -232,6 +232,34 @@ class ApplikuClient:
         result = self._check(self._session.get(url))
         return result if isinstance(result, list) else []
 
+    def request_app_logs(self, app_id: int, process: str = "web", tail: int = 100) -> float:
+        """POST /api/team/{team_path}/applications/{id}/request_advanced_logs → request_id"""
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/request_advanced_logs"
+        result = self._check(self._session.post(url, json={"process": process, "tail": tail}))
+        return result["request_id"]
+
+    def retrieve_app_logs(self, app_id: int, request_id: float) -> str | None:
+        """GET /api/team/{team_path}/applications/{id}/retrieve_advanced_logs/{request_id}"""
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/retrieve_advanced_logs/{request_id}"
+        result = self._check(self._session.get(url))
+        return result.get("logs") or None
+
+    def request_nginx_logs(self, app_id: int, domain: str, tail: int = 100) -> float:
+        """POST /api/team/{team_path}/applications/{id}/request_nginx_logs → request_id"""
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/request_nginx_logs"
+        result = self._check(self._session.post(url, json={"domain": domain, "tail": tail}))
+        return result["request_id"]
+
+    def retrieve_nginx_logs(self, app_id: int, request_id: float) -> str | None:
+        """GET /api/team/{team_path}/applications/{id}/retrieve_nginx_logs/{request_id}"""
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/retrieve_nginx_logs/{request_id}"
+        result = self._check(self._session.get(url))
+        return result.get("logs") or None
+
     def get_latest_deployment(self) -> dict:
         """GET /api/team/{team_path}/applications/{app_id}/deployments/latest"""
         team_path = self._require_team_path()
