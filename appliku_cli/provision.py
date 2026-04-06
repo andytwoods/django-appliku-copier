@@ -90,30 +90,27 @@ def _extract_failure_reason(log: str) -> list[str]:
     return hits
 
 
-def _print_deployment_log(client: ApplikuClient, deployment_id: int, failed: bool = False) -> None:
-    """Fetch and print the full deployment log, indented and dimmed.
+def _print_deployment_log(client: ApplikuClient, deployment_id: int, failed: bool = False, tail: int = 100) -> None:
+    """Fetch and print the deployment log (last `tail` lines), indented and dimmed.
 
     If failed=True, also extract and highlight the likely failure reason.
     """
     try:
-        deployment = client.get_deployment(deployment_id)
+        entries = client.get_deployment_logs(deployment_id)
     except ApplikuAPIError:
-        logger.debug("Could not fetch deployment detail for id=%s", deployment_id)
+        logger.debug("Could not fetch deployment logs for id=%s", deployment_id)
         return
 
-    # Try known field names for the log text
-    log = ""
-    for field in ("log", "output", "build_log", "release_log", "deployment_log"):
-        log = deployment.get(field) or ""
-        if log:
-            break
-
-    if not log:
-        logger.debug("Deployment object fields: %s", list(deployment.keys()))
+    if not entries:
+        logger.debug("No log entries returned for deployment %s", deployment_id)
         return
+
+    lines = [e.get("log", "") for e in entries if e.get("log")]
+    lines = lines[-tail:]
+    log = "\n".join(lines)
 
     print(_info("\n── Deployment log ──────────────────────────────────"))
-    for line in log.splitlines():
+    for line in lines:
         print(_log(line))
     print(_info("────────────────────────────────────────────────────\n"))
 
@@ -213,10 +210,14 @@ def _check_site_and_offer_redeploy(client: ApplikuClient, url: str) -> bool:
             print(_ok(f"  ✓ Site is up: {url}"))
             return True
         else:
-            print(_err(
-                f"  Site still not responding at {url}\n"
-                "  Check the deployment logs at https://app.appliku.com"
-            ))
+            print(_err(f"  Site still not responding at {url}"))
+            try:
+                deployment = client.get_latest_deployment()
+                dep_id = deployment.get("id")
+                if dep_id:
+                    _print_deployment_log(client, dep_id, failed=True)
+            except ApplikuAPIError:
+                pass
             return False
     else:
         print(_info(f"\nVisit {url} when ready."))

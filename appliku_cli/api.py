@@ -225,6 +225,13 @@ class ApplikuClient:
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/deployments/{deployment_id}"
         return self._check(self._session.get(url))
 
+    def get_deployment_logs(self, deployment_id: int) -> list[dict]:
+        """GET /api/team/{team_path}/deployments/{id}/logs"""
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/deployments/{deployment_id}/logs"
+        result = self._check(self._session.get(url))
+        return result if isinstance(result, list) else []
+
     def get_latest_deployment(self) -> dict:
         """GET /api/team/{team_path}/applications/{app_id}/deployments/latest"""
         team_path = self._require_team_path()
