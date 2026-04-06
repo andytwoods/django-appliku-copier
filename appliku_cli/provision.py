@@ -211,13 +211,15 @@ def _check_site_and_offer_redeploy(client: ApplikuClient, url: str) -> bool:
             return True
         else:
             print(_err(f"  Site still not responding at {url}"))
-            try:
-                deployment = client.get_latest_deployment()
-                dep_id = deployment.get("id")
-                if dep_id:
-                    _print_deployment_log(client, dep_id, failed=True)
-            except ApplikuAPIError:
-                pass
+            print(_warn("  Would you like to see the last 100 lines of the deployment log? [Y/n] "), end="")
+            if input().strip().lower() in ("", "y", "yes"):
+                try:
+                    deployment = client.get_latest_deployment()
+                    dep_id = deployment.get("id")
+                    if dep_id:
+                        _print_deployment_log(client, dep_id, failed=True)
+                except ApplikuAPIError:
+                    print(_err("  Could not fetch deployment logs."))
             return False
     else:
         print(_info(f"\nVisit {url} when ready."))
