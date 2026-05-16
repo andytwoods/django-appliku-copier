@@ -213,3 +213,43 @@ def detect_build_dummy_env(cwd: Path, settings_module: str, always_skip: set[str
     """
     required = detect_required_env_vars(cwd, settings_module, always_skip)
     return {var: "build-dummy" for var in required}
+
+
+def patch_dockerfile_collectstatic(
+    cwd: Path,
+    secret_key_var: str,
+    settings_module: str | None,
+    extra_vars: list[str],
+) -> bool:
+    """Rewrite the collectstatic RUN line in the Dockerfile to include all required build-time dummy env vars.
+
+    Returns True if the file was modified.
+    """
+    import re as _re
+
+    dockerfile = cwd / "Dockerfile"
+    if not dockerfile.exists():
+        return False
+
+    content = dockerfile.read_text()
+
+    env_parts = [f"{secret_key_var}=build-only"]
+    if settings_module:
+        env_parts.append(f"DJANGO_SETTINGS_MODULE={settings_module}")
+    for var in extra_vars:
+        env_parts.append(f"{var}=build-only")
+
+    env_prefix = " ".join(env_parts)
+    new_line = f"RUN {env_prefix} python manage.py collectstatic --noinput"
+
+    new_content = _re.sub(
+        r"RUN [A-Z_]+=\S+.*?python manage\.py collectstatic\b.*",
+        new_line,
+        content,
+    )
+
+    if new_content == content:
+        return False
+
+    dockerfile.write_text(new_content)
+    return True
