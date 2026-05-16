@@ -1,6 +1,7 @@
 """Orchestrate Appliku resource provisioning from Copier answers."""
 import logging
 import secrets
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -360,6 +361,14 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         cluster_id, server_id = _pick_deployment_target(client)
         save_deployment_target(server_id=server_id, cluster_id=cluster_id, cwd=cwd)
 
+    # Fetch vars already set in Appliku so we don't re-prompt for them on re-runs.
+    try:
+        existing_vars: set[str] = {v["name"] for v in client.get_config_vars()}
+        if existing_vars:
+            logger.info("%d config var(s) already set in Appliku — skipping those prompts", len(existing_vars))
+    except ApplikuAPIError:
+        existing_vars = set()
+
     # Vars already handled by the template or other provision steps — never prompt again
     _HANDLED_VARS = {
         "DATABASE_URL", "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS", "WEB_CONCURRENCY",
@@ -393,16 +402,15 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     # This prevents the build from failing when production settings import env vars at module load.
     if patch_dockerfile_collectstatic(cwd, secret_key_var, settings_module, extra_env_vars):
         print(_warn("\nDockerfile updated: collectstatic RUN command now includes all required build-time env vars."))
-        import subprocess as _sp
         try:
-            _sp.run(["git", "add", "Dockerfile"], cwd=cwd, check=True, capture_output=True)
-            _sp.run(
+            subprocess.run(["git", "add", "Dockerfile"], cwd=cwd, check=True, capture_output=True)
+            subprocess.run(
                 ["git", "commit", "-m", "chore: set build-time dummy env vars for collectstatic"],
                 cwd=cwd, check=True, capture_output=True,
             )
-            _sp.run(["git", "push"], cwd=cwd, check=True, capture_output=True)
+            subprocess.run(["git", "push"], cwd=cwd, check=True, capture_output=True)
             print(_ok("      ✓ Dockerfile committed and pushed."))
-        except _sp.CalledProcessError:
+        except subprocess.CalledProcessError:
             print(_err(
                 "      Could not auto-commit/push Dockerfile.\n"
                 "      Please commit and push it manually, then re-run appliku-setup."
@@ -410,11 +418,16 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
             sys.exit(1)
 
     # --- Collect all user inputs upfront before any API calls ---
-    config_vars: dict[str, str] = {secret_key_var: secrets.token_urlsafe(50)}
-    if settings_module:
+    config_vars: dict[str, str] = {}
+
+    # Never rotate an existing SECRET_KEY — that would invalidate all active sessions.
+    if secret_key_var not in existing_vars:
+        config_vars[secret_key_var] = secrets.token_urlsafe(50)
+    if settings_module and "DJANGO_SETTINGS_MODULE" not in existing_vars:
         config_vars["DJANGO_SETTINGS_MODULE"] = settings_module
+
     superuser_password: str | None = None
-    if superuser_email:
+    if superuser_email and "SUPERUSER_EMAIL" not in existing_vars:
         superuser_password = secrets.token_urlsafe(12)
         config_vars["SUPERUSER_EMAIL"] = superuser_email
         config_vars["SUPERUSER_PASSWORD"] = superuser_password
@@ -423,31 +436,34 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         "DJANGO_ADMIN_URL": "myadmin/",
     }
 
+    _S3_VARS = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_STORAGE_BUCKET_NAME", "AWS_S3_ENDPOINT_URL"]
     if media_storage == "s3_compatible":
-        print(_bold("S3-compatible storage config:"))
-        config_vars.update({
-            "AWS_ACCESS_KEY_ID": _prompt("AWS_ACCESS_KEY_ID"),
-            "AWS_SECRET_ACCESS_KEY": _prompt("AWS_SECRET_ACCESS_KEY"),
-            "AWS_STORAGE_BUCKET_NAME": _prompt("AWS_STORAGE_BUCKET_NAME"),
-            "AWS_S3_ENDPOINT_URL": _prompt("AWS_S3_ENDPOINT_URL"),
-        })
+        missing_s3 = [v for v in _S3_VARS if v not in existing_vars]
+        if missing_s3:
+            print(_bold("S3-compatible storage config:"))
+            for var in missing_s3:
+                config_vars[var] = _prompt(var)
+
+    _EMAIL_VARS = ["EMAIL_HOST", "EMAIL_PORT", "EMAIL_HOST_USER", "EMAIL_HOST_PASSWORD"]
     if email_backend != "console":
-        print(_bold(f"Email config ({email_backend}):"))
-        config_vars.update({
-            "EMAIL_HOST": _prompt("EMAIL_HOST"),
-            "EMAIL_PORT": _prompt("EMAIL_PORT", default="587"),
-            "EMAIL_HOST_USER": _prompt("EMAIL_HOST_USER"),
-            "EMAIL_HOST_PASSWORD": _prompt("EMAIL_HOST_PASSWORD"),
-        })
-    if use_sentry:
+        missing_email = [v for v in _EMAIL_VARS if v not in existing_vars]
+        if missing_email:
+            print(_bold(f"Email config ({email_backend}):"))
+            for var in missing_email:
+                config_vars[var] = _prompt(var, default="587" if var == "EMAIL_PORT" else None)
+
+    if use_sentry and "SENTRY_DSN" not in existing_vars:
         print(_bold("Sentry config:"))
         config_vars["SENTRY_DSN"] = _prompt("SENTRY_DSN")
+
     if extra_env_vars:
-        print(_bold(f"Additional required env vars detected in {settings_module}:"))
-        for var in extra_env_vars:
-            value = _prompt(f"  {var}", default=_EXTRA_VAR_DEFAULTS.get(var))
-            if value:
-                config_vars[var] = value
+        missing_extra = [v for v in extra_env_vars if v not in existing_vars]
+        if missing_extra:
+            print(_bold(f"Additional required env vars detected in {settings_module}:"))
+            for var in missing_extra:
+                value = _prompt(f"  {var}", default=_EXTRA_VAR_DEFAULTS.get(var))
+                if value:
+                    config_vars[var] = value
 
     # --- Push all config vars in one step ---
     print(_bold(f"[{step}/2] Pushing config vars…"))
