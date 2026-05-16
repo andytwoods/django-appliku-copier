@@ -9,7 +9,7 @@ from colorama import Fore, Style, init as colorama_init
 
 from appliku_cli.api import ApplikuAPIError, ApplikuClient
 from appliku_cli.credentials import Credentials, save_deployment_target, save_provisioned
-from appliku_cli.detect import detect_allowed_hosts_var, detect_django_settings_module, detect_required_env_vars, detect_secret_key_var
+from appliku_cli.detect import detect_allowed_hosts_var, detect_django_settings_module, detect_required_env_vars, detect_secret_key_var, patch_dockerfile_collectstatic
 
 colorama_init(autoreset=True)
 
@@ -388,6 +388,26 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     extra_env_vars = detect_required_env_vars(cwd, settings_module, skip_vars) if settings_module else []
     if extra_env_vars:
         logger.info("Detected %d additional required env var(s): %s", len(extra_env_vars), ", ".join(extra_env_vars))
+
+    # Patch the Dockerfile collectstatic line to include all required build-time dummy vars.
+    # This prevents the build from failing when production settings import env vars at module load.
+    if patch_dockerfile_collectstatic(cwd, secret_key_var, settings_module, extra_env_vars):
+        print(_warn("\nDockerfile updated: collectstatic RUN command now includes all required build-time env vars."))
+        import subprocess as _sp
+        try:
+            _sp.run(["git", "add", "Dockerfile"], cwd=cwd, check=True, capture_output=True)
+            _sp.run(
+                ["git", "commit", "-m", "chore: set build-time dummy env vars for collectstatic"],
+                cwd=cwd, check=True, capture_output=True,
+            )
+            _sp.run(["git", "push"], cwd=cwd, check=True, capture_output=True)
+            print(_ok("      ✓ Dockerfile committed and pushed."))
+        except _sp.CalledProcessError:
+            print(_err(
+                "      Could not auto-commit/push Dockerfile.\n"
+                "      Please commit and push it manually, then re-run appliku-setup."
+            ))
+            sys.exit(1)
 
     # --- Collect all user inputs upfront before any API calls ---
     config_vars: dict[str, str] = {secret_key_var: secrets.token_urlsafe(50)}
