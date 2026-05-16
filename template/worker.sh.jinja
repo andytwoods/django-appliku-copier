@@ -5,5 +5,5 @@ exec celery -A config worker -l INFO
 {% elif task_runner == "huey" -%}
 #!/usr/bin/env bash
 set -e
-exec python manage.py run_huey
+exec python manage.py djangohuey
 {% endif %}

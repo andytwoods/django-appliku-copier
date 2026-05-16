@@ -26,8 +26,7 @@ uv tool install copier
 **3. Generate deployment files** (run from inside your Django project):
 
 ```bash
-copier copy gh:andytwoods/django-appliku-copier . --trust
-```
+c```
 
 ![copier demo](readme_static/copier.gif)
 

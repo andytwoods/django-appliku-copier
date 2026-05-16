@@ -389,7 +389,7 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
     if extra_env_vars:
         logger.info("Detected %d additional required env var(s): %s", len(extra_env_vars), ", ".join(extra_env_vars))
 
-    print(_bold(f"[{step}/2] Pushing config vars…"))
+    # --- Collect all user inputs upfront before any API calls ---
     config_vars: dict[str, str] = {secret_key_var: secrets.token_urlsafe(50)}
     if settings_module:
         config_vars["DJANGO_SETTINGS_MODULE"] = settings_module
@@ -398,46 +398,42 @@ def run_provision(credentials: Credentials, answers: dict, cwd: Path | None = No
         superuser_password = secrets.token_urlsafe(12)
         config_vars["SUPERUSER_EMAIL"] = superuser_email
         config_vars["SUPERUSER_PASSWORD"] = superuser_password
-    push_vars(config_vars)
-    print(_ok("      ✓ Done"))
-    step += 1
+
+    _EXTRA_VAR_DEFAULTS: dict[str, str] = {
+        "DJANGO_ADMIN_URL": "myadmin/",
+    }
 
     if media_storage == "s3_compatible":
-        print(_bold(f"[{step}/2] Configuring S3-compatible storage…"))
-        push_vars({
+        print(_bold("S3-compatible storage config:"))
+        config_vars.update({
             "AWS_ACCESS_KEY_ID": _prompt("AWS_ACCESS_KEY_ID"),
             "AWS_SECRET_ACCESS_KEY": _prompt("AWS_SECRET_ACCESS_KEY"),
             "AWS_STORAGE_BUCKET_NAME": _prompt("AWS_STORAGE_BUCKET_NAME"),
             "AWS_S3_ENDPOINT_URL": _prompt("AWS_S3_ENDPOINT_URL"),
         })
-        print(_ok("      ✓ Done"))
     if email_backend != "console":
-        print(_bold(f"[{step}/2] Configuring email ({email_backend})…"))
-        push_vars({
+        print(_bold(f"Email config ({email_backend}):"))
+        config_vars.update({
             "EMAIL_HOST": _prompt("EMAIL_HOST"),
             "EMAIL_PORT": _prompt("EMAIL_PORT", default="587"),
             "EMAIL_HOST_USER": _prompt("EMAIL_HOST_USER"),
             "EMAIL_HOST_PASSWORD": _prompt("EMAIL_HOST_PASSWORD"),
         })
-        print(_ok("      ✓ Done"))
     if use_sentry:
-        print(_bold(f"[{step}/2] Configuring Sentry…"))
-        push_vars({"SENTRY_DSN": _prompt("SENTRY_DSN")})
-        print(_ok("      ✓ Done"))
-    _EXTRA_VAR_DEFAULTS: dict[str, str] = {
-        "DJANGO_ADMIN_URL": "myadmin/",
-    }
-
+        print(_bold("Sentry config:"))
+        config_vars["SENTRY_DSN"] = _prompt("SENTRY_DSN")
     if extra_env_vars:
         print(_bold(f"Additional required env vars detected in {settings_module}:"))
-        extra_values = {}
         for var in extra_env_vars:
             value = _prompt(f"  {var}", default=_EXTRA_VAR_DEFAULTS.get(var))
             if value:
-                extra_values[var] = value
-        if extra_values:
-            push_vars(extra_values)
-        print(_ok("      ✓ Done"))
+                config_vars[var] = value
+
+    # --- Push all config vars in one step ---
+    print(_bold(f"[{step}/2] Pushing config vars…"))
+    push_vars(config_vars)
+    print(_ok("      ✓ Done"))
+    step += 1
 
     print(_bold("[2/2] Pushing domains and triggering first deployment…"))
     pre_domains = _get_domains(client)
