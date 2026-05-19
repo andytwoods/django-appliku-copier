@@ -295,9 +295,14 @@ class ApplikuClient:
         deadline = time.time() + timeout
         while time.time() < deadline:
             result = self._check(self._session.get(url))
-            entries = result if isinstance(result, list) else [result]
-            text = "\n".join(e.get("log", "") for e in entries if e.get("log"))
-            status = entries[-1].get("command_status", "running") if entries else "running"
+            # Response may be a list of log-line objects or a single summary object
+            if isinstance(result, list):
+                entries = result
+                text = "\n".join(e.get("log", "") for e in entries if e.get("log"))
+                status = entries[-1].get("command_status", "running") if entries else "running"
+            else:
+                text = result.get("log", "") or result.get("output", "") or result.get("logs", "")
+                status = result.get("command_status", "running")
             if status not in ("pending", "running", ""):
                 return text, status
             time.sleep(2)

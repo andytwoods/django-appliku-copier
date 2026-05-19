@@ -135,12 +135,20 @@ def main() -> None:
             continue
 
         if not out:
-            print(_warn("  No log files found."))
+            print(_warn("  No output from server (command may have failed or no log files exist)."))
             continue
 
         entries = _parse_log_sizes(out)
+        total = len(entries)
+        over_warn = sum(1 for size, _ in entries if size >= warn_bytes)
+        over_wipe = sum(1 for size, _ in entries if size >= wipe_bytes)
+
+        print(f"  Log files found: {_bold(str(total))}   "
+              f"over {args.warn_mb} MB: {_warn(str(over_warn)) if over_warn else _ok('0')}   "
+              f"over {args.wipe_mb} MB: {_err(str(over_wipe)) if over_wipe else _ok('0')}")
+
         if not entries:
-            print(_ok("  No container log files found."))
+            print(_ok("  No log files found."))
             continue
 
         # Resolve container IDs → names in one API call
@@ -167,8 +175,7 @@ def main() -> None:
                 print(f"  {_warn('[LARGE]')}  {size_str:>10}  {name}")
 
         if not shown_any:
-            print(_ok(f"  All log files are under {args.warn_mb} MB."))
-            continue
+            continue  # summary line already printed above
 
         if not to_wipe:
             print()
