@@ -84,6 +84,10 @@ def main() -> None:
         "--auto-wipe", action="store_true",
         help="Wipe logs above --wipe-mb without prompting",
     )
+    parser.add_argument(
+        "--debug", action="store_true",
+        help="Print raw command output for troubleshooting",
+    )
     args = parser.parse_args()
 
     warn_bytes = args.warn_mb * 1024 * 1024
@@ -137,6 +141,10 @@ def main() -> None:
         if not out:
             print(_warn("  No output from server (command may have failed or no log files exist)."))
             continue
+
+        if args.debug:
+            print(_dim(f"  Raw output ({len(out)} chars):"))
+            print(_dim(f"  {repr(out[:500])}"))
 
         entries = _parse_log_sizes(out)
         total = len(entries)
