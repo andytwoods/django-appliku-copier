@@ -284,10 +284,11 @@ class ApplikuClient:
         }))
 
     def poll_server_command(self, run_id: int, timeout: int = 60) -> tuple[str, str]:
-        """Poll GET .../server_run/{id}/logs until terminal.
+        """Poll GET .../server_run/{id}/logs until the command finishes.
 
         Returns (combined_log_text, final_status).
-        Terminal statuses are anything other than 'pending' or 'running'.
+        Uses '+++ Finished with code:' in the log as the reliable completion
+        signal, since command_status turns terminal before the full output arrives.
         """
         import time
         team_path = self._require_team_path()
@@ -295,7 +296,6 @@ class ApplikuClient:
         deadline = time.time() + timeout
         while time.time() < deadline:
             result = self._check(self._session.get(url))
-            # Response may be a list of log-line objects or a single summary object
             if isinstance(result, list):
                 entries = result
                 text = "\n".join(e.get("log", "") for e in entries if e.get("log"))
@@ -303,7 +303,16 @@ class ApplikuClient:
             else:
                 text = result.get("log", "") or result.get("output", "") or result.get("logs", "")
                 status = result.get("command_status", "running")
+            if "+++ Finished with code:" in text:
+                return text, status
             if status not in ("pending", "running", ""):
+                # Status is terminal but output marker not seen yet — one more try
+                time.sleep(1)
+                result = self._check(self._session.get(url))
+                if isinstance(result, list):
+                    text = "\n".join(e.get("log", "") for e in result if e.get("log"))
+                else:
+                    text = result.get("log", "") or result.get("output", "") or result.get("logs", "")
                 return text, status
             time.sleep(2)
         return "", "timeout"

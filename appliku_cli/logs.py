@@ -29,11 +29,24 @@ def _fmt_bytes(n: float) -> str:
 
 
 def _run(client: ApplikuClient, server_id: int, cmd: str, timeout: int = 60) -> str:
-    """Run a command on the server via the Appliku API and return its output."""
+    """Run a command on the server via the Appliku API and return its stdout."""
     result = client.run_server_command(server_id, cmd, username="root", sudo=True)
     run_id = result["id"]
-    text, status = client.poll_server_command(run_id, timeout=timeout)
-    return text
+    text, _status = client.poll_server_command(run_id, timeout=timeout)
+    # Strip Appliku's connection header and trailing finish line; keep only command output.
+    # Header ends after the "??? Connection to ..." line; output ends before "+++ Finished".
+    lines = text.splitlines()
+    start = 0
+    for i, line in enumerate(lines):
+        if line.startswith("??? Connection"):
+            start = i + 1
+            break
+    end = len(lines)
+    for i, line in enumerate(lines):
+        if line.startswith("+++ Finished"):
+            end = i
+            break
+    return "\n".join(lines[start:end]).strip()
 
 
 def _parse_log_sizes(output: str) -> list[tuple[int, str]]:
