@@ -267,6 +267,42 @@ class ApplikuClient:
         url = f"{BASE_URL}/api/team/{team_path}/applications/{app_id}/deployments/latest"
         return self._check(self._session.get(url))
 
+    def run_server_command(
+        self,
+        server_id: int,
+        command: str,
+        username: str = "root",
+        sudo: bool = False,
+    ) -> dict:
+        """POST /api/team/{team_path}/server_list/{server_id}/run → {id, command_status, ...}"""
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/server_list/{server_id}/run"
+        return self._check(self._session.post(url, json={
+            "command": command,
+            "username": username,
+            "sudo": sudo,
+        }))
+
+    def poll_server_command(self, run_id: int, timeout: int = 60) -> tuple[str, str]:
+        """Poll GET .../server_run/{id}/logs until terminal.
+
+        Returns (combined_log_text, final_status).
+        Terminal statuses are anything other than 'pending' or 'running'.
+        """
+        import time
+        team_path = self._require_team_path()
+        url = f"{BASE_URL}/api/team/{team_path}/server_run/{run_id}/logs"
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = self._check(self._session.get(url))
+            entries = result if isinstance(result, list) else [result]
+            text = "\n".join(e.get("log", "") for e in entries if e.get("log"))
+            status = entries[-1].get("command_status", "running") if entries else "running"
+            if status not in ("pending", "running", ""):
+                return text, status
+            time.sleep(2)
+        return "", "timeout"
+
     def get_app(self) -> dict:
         """GET /api/team/{team_path}/applications/{app_id}/"""
         team_path = self._require_team_path()

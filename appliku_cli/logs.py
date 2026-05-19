@@ -1,6 +1,5 @@
 """Check and truncate Docker container log files on Appliku servers."""
 import argparse
-import subprocess
 import sys
 
 from colorama import Fore, Style, init as colorama_init
@@ -21,26 +20,6 @@ def _bold(msg: str) -> str: return f"{Style.BRIGHT}{msg}{Style.RESET_ALL}"
 def _dim(msg: str) -> str:  return f"{Style.DIM}{msg}{Style.RESET_ALL}"
 
 
-def _ssh(host: str, cmd: str, user: str = "root") -> tuple[str, int]:
-    try:
-        result = subprocess.run(
-            [
-                "ssh",
-                "-o", "StrictHostKeyChecking=no",
-                "-o", "ConnectTimeout=10",
-                "-o", "BatchMode=yes",
-                f"{user}@{host}",
-                cmd,
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        return result.stdout.strip(), result.returncode
-    except subprocess.TimeoutExpired:
-        return "", 1
-
-
 def _fmt_bytes(n: float) -> str:
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if n < 1024:
@@ -49,17 +28,12 @@ def _fmt_bytes(n: float) -> str:
     return f"{n:.1f} PB"
 
 
-def _container_names(host: str) -> dict[str, str]:
-    """Return {short_id: container_name} for all containers via docker ps -a."""
-    out, rc = _ssh(host, "docker ps -a --format '{{.ID}} {{.Names}}'")
-    names: dict[str, str] = {}
-    if rc != 0 or not out:
-        return names
-    for line in out.splitlines():
-        parts = line.split(None, 1)
-        if len(parts) == 2:
-            names[parts[0]] = parts[1]
-    return names
+def _run(client: ApplikuClient, server_id: int, cmd: str, timeout: int = 60) -> str:
+    """Run a command on the server via the Appliku API and return its output."""
+    result = client.run_server_command(server_id, cmd, username="root", sudo=True)
+    run_id = result["id"]
+    text, status = client.poll_server_command(run_id, timeout=timeout)
+    return text
 
 
 def _parse_log_sizes(output: str) -> list[tuple[int, str]]:
@@ -75,12 +49,15 @@ def _parse_log_sizes(output: str) -> list[tuple[int, str]]:
     return sorted(entries, reverse=True)
 
 
-def _server_ip(server: dict) -> str | None:
-    for key in ("ip", "ip_address", "host", "hostname"):
-        val = (server.get(key) or "").strip()
-        if val:
-            return val
-    return None
+def _container_names(client: ApplikuClient, server_id: int) -> dict[str, str]:
+    """Return {short_id: container_name} for all containers on the server."""
+    out = _run(client, server_id, "docker ps -a --format '{{.ID}} {{.Names}}'")
+    names: dict[str, str] = {}
+    for line in out.splitlines():
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            names[parts[0]] = parts[1]
+    return names
 
 
 def _resolve_name(path: str, id_to_name: dict[str, str]) -> str:
@@ -134,26 +111,31 @@ def main() -> None:
         return
 
     for server in servers:
-        ip = _server_ip(server)
-        srv_name = server.get("name", ip or "unknown")
+        server_id = server.get("id")
+        srv_name = server.get("name", str(server_id))
 
         print()
         print(_bold("═" * 64))
-        print(_bold(f"  {srv_name}  ({ip or 'no IP'})"))
+        print(_bold(f"  {srv_name}"))
         print(_bold("═" * 64))
 
-        if not ip:
-            print(_warn("  No IP address — cannot SSH. Skipping."))
+        if not server_id:
+            print(_warn("  Server has no ID — skipping."))
             continue
 
-        # Fetch log file sizes via SSH
-        out, rc = _ssh(
-            ip,
-            "find /var/lib/docker/containers -name '*-json.log' -printf '%s %p\\n' 2>/dev/null",
-        )
+        print(_dim("  Fetching log sizes…"))
+        try:
+            out = _run(
+                client, server_id,
+                "find /var/lib/docker/containers -name '*-json.log' -printf '%s %p\\n' 2>/dev/null",
+                timeout=30,
+            )
+        except ApplikuAPIError as exc:
+            print(_err(f"  API error: {exc}"))
+            continue
+
         if not out:
-            print(_warn("  Could not read log sizes (SSH failed or no logs found)."))
-            print(_dim(f"  Tip: ensure your SSH key allows access to root@{ip}"))
+            print(_warn("  No log files found."))
             continue
 
         entries = _parse_log_sizes(out)
@@ -161,8 +143,11 @@ def main() -> None:
             print(_ok("  No container log files found."))
             continue
 
-        # Resolve short container IDs → names once
-        id_to_name = _container_names(ip)
+        # Resolve container IDs → names in one API call
+        try:
+            id_to_name = _container_names(client, server_id)
+        except ApplikuAPIError:
+            id_to_name = {}
 
         # Report
         to_wipe: list[tuple[int, str]] = []
@@ -170,7 +155,7 @@ def main() -> None:
 
         for size_bytes, path in entries:
             if size_bytes < warn_bytes:
-                break  # list is sorted descending — nothing bigger below
+                break
             shown_any = True
             name = _resolve_name(path, id_to_name)
             size_str = _fmt_bytes(size_bytes)
@@ -209,11 +194,11 @@ def main() -> None:
 
         for size_bytes, path in to_wipe:
             name = _resolve_name(path, id_to_name)
-            _, wipe_rc = _ssh(ip, f"truncate -s 0 {path}")
-            if wipe_rc == 0:
+            try:
+                _run(client, server_id, f"truncate -s 0 {path}", timeout=15)
                 print(_ok(f"  ✓ Wiped {name}  ({_fmt_bytes(size_bytes)} freed)"))
-            else:
-                print(_err(f"  ✗ Failed to wipe {name}"))
+            except ApplikuAPIError as exc:
+                print(_err(f"  ✗ Failed to wipe {name}: {exc}"))
 
     print()
     print(_bold("═" * 64))
