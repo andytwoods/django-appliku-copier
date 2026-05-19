@@ -239,19 +239,14 @@ Example output:
   [HUGE]    111.0 GB  iceplunge-huey-1
   [LARGE]     142 MB  costar-web-1
 
-  1 log(s) exceed 1000 MB:
+  1 log(s) exceed 100 MB:
        111.0 GB  iceplunge-huey-1
 
-  Wipe them all? [y/N]
+  Truncate them all? [y/N]
 ```
 
-Thresholds are configurable:
-
-| Flag | Default | Meaning |
-|---|---|---|
-| `--warn-mb` | 100 | Report logs above this size |
-| `--wipe-mb` | 1000 | Prompt to wipe above this size |
-| `--auto-wipe` | off | Wipe without prompting |
+By default anything over 100 MB is reported and offered for truncation.
+Flags: `--warn-mb N`, `--wipe-mb N` to adjust thresholds; `--auto-truncate` to skip the prompt.
 
 ### Preventing recurrence
 

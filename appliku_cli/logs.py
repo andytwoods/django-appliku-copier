@@ -10,7 +10,7 @@ from appliku_cli.credentials import load_credentials
 colorama_init(autoreset=True)
 
 DEFAULT_WARN_MB = 100
-DEFAULT_WIPE_MB = 1000  # prompt to wipe above 1 GB by default
+DEFAULT_WIPE_MB = 100  # prompt to truncate anything worth reporting
 
 
 def _ok(msg: str) -> str:   return f"{Fore.GREEN}{msg}{Style.RESET_ALL}"
@@ -90,12 +90,12 @@ def main() -> None:
         help=f"Report logs above this size in MB (default: {DEFAULT_WARN_MB})",
     )
     parser.add_argument(
-        "--wipe-mb", type=int, default=DEFAULT_WIPE_MB,
-        help=f"Prompt to wipe logs above this size in MB (default: {DEFAULT_WIPE_MB})",
+        "--truncate-mb", type=int, default=DEFAULT_WIPE_MB,
+        help=f"Prompt to truncate logs above this size in MB (default: {DEFAULT_WIPE_MB})",
     )
     parser.add_argument(
-        "--auto-wipe", action="store_true",
-        help="Wipe logs above --wipe-mb without prompting",
+        "--auto-truncate", action="store_true",
+        help="Truncate logs above --truncate-mb without prompting",
     )
     parser.add_argument(
         "--debug", action="store_true",
@@ -104,7 +104,7 @@ def main() -> None:
     args = parser.parse_args()
 
     warn_bytes = args.warn_mb * 1024 * 1024
-    wipe_bytes = args.wipe_mb * 1024 * 1024
+    truncate_bytes = args.truncate_mb * 1024 * 1024
 
     credentials = load_credentials()
     if not credentials.team_path:
@@ -162,11 +162,11 @@ def main() -> None:
         entries = _parse_log_sizes(out)
         total = len(entries)
         over_warn = sum(1 for size, _ in entries if size >= warn_bytes)
-        over_wipe = sum(1 for size, _ in entries if size >= wipe_bytes)
+        over_truncate = sum(1 for size, _ in entries if size >= truncate_bytes)
 
         print(f"  Log files found: {_bold(str(total))}   "
               f"over {args.warn_mb} MB: {_warn(str(over_warn)) if over_warn else _ok('0')}   "
-              f"over {args.wipe_mb} MB: {_err(str(over_wipe)) if over_wipe else _ok('0')}")
+              f"over {args.truncate_mb} MB: {_err(str(over_truncate)) if over_truncate else _ok('0')}")
 
         if not entries:
             print(_ok("  No log files found."))
@@ -179,7 +179,7 @@ def main() -> None:
             id_to_name = {}
 
         # Report
-        to_wipe: list[tuple[int, str]] = []
+        to_truncate: list[tuple[int, str]] = []
         shown_any = False
 
         for size_bytes, path in entries:
@@ -189,44 +189,44 @@ def main() -> None:
             name = _resolve_name(path, id_to_name)
             size_str = _fmt_bytes(size_bytes)
 
-            if size_bytes >= wipe_bytes:
+            if size_bytes >= truncate_bytes:
                 print(f"  {_err('[HUGE]')}   {size_str:>10}  {name}")
-                to_wipe.append((size_bytes, path))
+                to_truncate.append((size_bytes, path))
             else:
                 print(f"  {_warn('[LARGE]')}  {size_str:>10}  {name}")
 
         if not shown_any:
             continue  # summary line already printed above
 
-        if not to_wipe:
+        if not to_truncate:
             print()
-            print(_warn(f"  No logs above wipe threshold ({args.wipe_mb} MB)."))
+            print(_warn(f"  No logs above truncate threshold ({args.truncate_mb} MB)."))
             continue
 
-        # Wipe prompt
+        # Truncate prompt
         print()
-        if args.auto_wipe:
+        if args.auto_truncate:
             confirmed = True
         else:
-            print(_warn(f"  {len(to_wipe)} log(s) exceed {args.wipe_mb} MB:"))
-            for size_bytes, path in to_wipe:
+            print(_warn(f"  {len(to_truncate)} log(s) exceed {args.truncate_mb} MB:"))
+            for size_bytes, path in to_truncate:
                 name = _resolve_name(path, id_to_name)
                 print(f"    {_fmt_bytes(size_bytes):>10}  {name}")
             print()
-            answer = input(_warn("  Wipe them all? [y/N] ")).strip().lower()
+            answer = input(_warn("  Truncate them all? [y/N] ")).strip().lower()
             confirmed = answer == "y"
 
         if not confirmed:
             print(_warn("  Skipped."))
             continue
 
-        for size_bytes, path in to_wipe:
+        for size_bytes, path in to_truncate:
             name = _resolve_name(path, id_to_name)
             try:
                 _run(client, server_id, f"truncate -s 0 {path}", timeout=15)
-                print(_ok(f"  ✓ Wiped {name}  ({_fmt_bytes(size_bytes)} freed)"))
+                print(_ok(f"  ✓ Truncated {name}  ({_fmt_bytes(size_bytes)} freed)"))
             except ApplikuAPIError as exc:
-                print(_err(f"  ✗ Failed to wipe {name}: {exc}"))
+                print(_err(f"  ✗ Failed to truncate {name}: {exc}"))
 
     print()
     print(_bold("═" * 64))
