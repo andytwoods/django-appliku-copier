@@ -218,6 +218,61 @@ prints the equivalent `docker rm -f` command instead.
 
 ---
 
+## Log file audit
+
+Docker writes container stdout/stderr to JSON log files with no size limit by
+default. A single crash-looping worker can fill a disk in hours.
+`appliku-logs` SSHes to each server as `root`, checks every container's log
+file size, and offers to truncate the large ones in place (safe — no restart
+needed).
+
+```bash
+uvx --from git+https://github.com/andytwoods/django-appliku-copier.git appliku-logs
+```
+
+Example output:
+
+```
+════════════════════════════════════════════════════════════════
+  ubuntu-4gb-nbg1-1  (167.235.66.120)
+════════════════════════════════════════════════════════════════
+  [HUGE]    111.0 GB  iceplunge-huey-1
+  [LARGE]     142 MB  costar-web-1
+
+  1 log(s) exceed 1000 MB:
+       111.0 GB  iceplunge-huey-1
+
+  Wipe them all? [y/N]
+```
+
+Thresholds are configurable:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--warn-mb` | 100 | Report logs above this size |
+| `--wipe-mb` | 1000 | Prompt to wipe above this size |
+| `--auto-wipe` | off | Wipe without prompting |
+
+### Preventing recurrence
+
+Add log rotation to `/etc/docker/daemon.json` on your server so logs are
+capped automatically for all future containers:
+
+```json
+{
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "50m",
+    "max-file": "3"
+  }
+}
+```
+
+Then reload Docker: `systemctl reload docker`. Existing containers pick up the
+new limit on their next redeploy.
+
+---
+
 ## Django project requirements
 
 The template does not touch your Django source files. You need these in place

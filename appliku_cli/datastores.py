@@ -37,12 +37,26 @@ _TYPE_LABEL = {
     "rabbitmq":   "rabbitmq",
 }
 
+# Maps stock Docker image prefix → canonical type key used in _TYPE_LABEL
+_STOCK_IMAGE_TO_TYPE = {
+    "postgres":  "postgres",
+    "redis":     "redis",
+    "mysql":     "mysql",
+    "rabbitmq":  "rabbitmq",
+}
+
 def _short_type(store_type: str) -> str:
     s = (store_type or "").lower()
     for key, label in _TYPE_LABEL.items():
         if key in s:
             return label
     return store_type or "?"
+
+
+def _base_image_type(image: str) -> str | None:
+    """Return canonical type for a stock Docker image name, e.g. 'postgres:16' → 'postgres'."""
+    name = image.split(":")[0].lower()
+    return _STOCK_IMAGE_TO_TYPE.get(name)
 
 
 # Docker container names for Appliku-managed datastores follow the pattern "{id}-db"
@@ -220,14 +234,45 @@ def main() -> None:
         print()
         print(_ok("  No stray datastores detected."))
 
-    # Unnamed stock-image containers can't be identified by ID
+    # Unnamed stock-image containers can't be identified by ID — use count comparison
     unnamed = {ds_id: img for ds_id, img in docker_running.items() if ds_id < 0}
     if unnamed:
+        # Count running stock containers by base type
+        running_counts: dict[str, int] = {}
+        for img in unnamed.values():
+            t = _base_image_type(img)
+            if t:
+                running_counts[t] = running_counts.get(t, 0) + 1
+
+        # Count attached datastores by base type
+        attached_counts: dict[str, int] = {}
+        for info in attached.values():
+            t = _short_type(info["store_type"])
+            attached_counts[t] = attached_counts.get(t, 0) + 1
+
         print()
         print(_warn("  Note: the following DB containers use stock images and cannot be"))
-        print(_warn("  matched to a datastore ID — check the Appliku dashboard if needed:"))
-        for _, image in sorted(unnamed.items(), key=lambda kv: kv[1]):
-            print(f"    {_dim(image)}")
+        print(_warn("  matched to a datastore ID by name. Count comparison:"))
+        any_likely_stray = False
+        for t, running in sorted(running_counts.items()):
+            n_attached = attached_counts.get(t, 0)
+            excess = running - n_attached
+            if excess > 0:
+                any_likely_stray = True
+                print(
+                    f"    {_err(t):20s}  running: {running}  attached: {n_attached}"
+                    f"  → {_err(f'{excess} likely stray')}"
+                )
+            else:
+                print(
+                    f"    {_ok(t):20s}  running: {running}  attached: {n_attached}"
+                    f"  → {_ok('counts match')}"
+                )
+        if any_likely_stray:
+            print()
+            print(_warn("  Likely-stray containers cannot be removed via the Appliku API"))
+            print(_warn("  (they have no registered ID). To clean them up, SSH to your server"))
+            print(_warn("  and run:  docker ps  then  docker rm -f <container_id>"))
 
     # ── Stray app containers ──────────────────────────────────────────────────
     if stray_app_containers:
